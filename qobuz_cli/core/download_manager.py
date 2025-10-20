@@ -323,7 +323,7 @@ class DownloadManager:
         """Downloads the discography of an artist, streaming albums to conserve memory."""
         artist_discography_gen = self.api_client.fetch_artist_discography(artist_id)
         try:
-            first_page = await artist_discography_gen.__anext__()
+            first_page = await anext(artist_discography_gen)
         except StopAsyncIteration:
             self.track_processor.progress_manager.log_message(
                 f"Artist ID '{escape(artist_id)}' has no albums.", level="warning"
@@ -426,7 +426,7 @@ class DownloadManager:
         """Downloads all albums from a label."""
         label_discography_gen = self.api_client.fetch_label_discography(label_id)
         try:
-            first_page = await label_discography_gen.__anext__()
+            first_page = await anext(label_discography_gen)
         except StopAsyncIteration:
             self.track_processor.progress_manager.log_message(
                 f"Label ID '{escape(label_id)}' has no albums.", level="warning"

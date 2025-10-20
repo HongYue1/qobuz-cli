@@ -1,8 +1,0 @@
-pathvalidate
-aiohttp
-mutagen
-aiofiles
-rich
-typer
-pydantic
-beautifulsoup4
