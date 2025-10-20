@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.10.0"]
+dev = ["ruff>=0.10.0", "jsonschema"]
 
 [project.urls]
 Homepage = "https://github.com/HongYue1/qobuz-cli"
@@ -51,6 +51,7 @@ line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
+preview = true
 
 select = [
     "E",     # pycodestyle errors
@@ -65,13 +66,9 @@ select = [
     "RUF",   # Ruff-specific rules
     "ASYNC", # flake8-async
     "S",     # flake8-bandit
+    "F541",  # f-string-missing-placeholders
 ]
 
-# ignore = [
-#     "S101", # Allow assert statements
-#     "S603", # Allow subprocess without shell=True check
-#     "S607", # Allow partial executable paths
-# ]
 
 # Allow autofix for specific rules
 fixable = ["ALL"]

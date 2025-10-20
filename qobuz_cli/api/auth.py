@@ -1,10 +1,11 @@
 """
-Handles authentication with the Qobuz API, including credential login and app secret validation.
+Handles authentication with the Qobuz API, including credential login
+and app secret validation.
 """
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
@@ -35,7 +36,7 @@ class QobuzAuthenticator:
         self._api_client = api_client
         self._secrets_tested = False
 
-    async def authenticate_with_token(self, token: str) -> Dict[str, Any]:
+    async def authenticate_with_token(self, token: str) -> dict[str, Any]:
         """
         Authenticates the client using a pre-existing user token.
 
@@ -52,7 +53,8 @@ class QobuzAuthenticator:
         try:
             user_info = await self._api_client.api_call("user/get")
             log.info(
-                f"Successfully authenticated as: {user_info.get('email', 'Unknown User')}"
+                "Successfully authenticated as: "
+                f"{user_info.get('email', 'Unknown User')}"
             )
 
             if not user_info.get("credential", {}).get("parameters"):
@@ -64,12 +66,12 @@ class QobuzAuthenticator:
             if e.status == 401:
                 raise AuthenticationError(
                     "The provided token is invalid or has expired."
-                )
+                ) from e
             raise
 
     async def authenticate_with_credentials(
         self, email: str, password_md5: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Authenticates using an email and an MD5-hashed password.
 
@@ -114,14 +116,15 @@ class QobuzAuthenticator:
         ]
         results = await asyncio.gather(*test_tasks)
 
-        for secret, is_valid in zip(self._api_client.secrets, results):
+        for secret, is_valid in zip(self._api_client.secrets, results, strict=True):
             if is_valid:
                 self._api_client.app_secret = secret
                 log.debug(f"Valid secret found: {secret[:8]}...")
                 return
 
         raise InvalidAppSecretError(
-            "No valid app secrets found. Please run 'qobuz-cli init' to fetch new secrets."
+            "No valid app secrets found."
+            " Please run 'qobuz-cli init' to fetch new secrets."
         )
 
     async def _test_secret(self, secret: str) -> bool:

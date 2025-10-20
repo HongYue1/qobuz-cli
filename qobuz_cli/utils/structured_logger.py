@@ -9,7 +9,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from rich.console import Console
 
@@ -30,7 +30,7 @@ class StructuredLogger:
     def __init__(
         self,
         name: str,
-        log_dir: Optional[Path] = None,
+        log_dir: Path | None = None,
         enable_json: bool = True,
         enable_console: bool = True,
     ):
@@ -58,10 +58,10 @@ class StructuredLogger:
             log_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             json_log_path = log_dir / f"qobuz_cli_{timestamp}.jsonl"
-            self._json_file = open(json_log_path, "a", encoding="utf-8")
+            self._json_file = open(json_log_path, "a", encoding="utf-8")  # noqa: SIM115
 
         # Session context (added to all log entries)
-        self._session_context: Dict[str, Any] = {
+        self._session_context: dict[str, Any] = {
             "session_id": f"{int(time.time())}_{id(self)}",
             "start_time": datetime.now().isoformat(),
         }
@@ -205,7 +205,7 @@ class APILogger:
     def __init__(self, logger: StructuredLogger):
         self.logger = logger
 
-    def request_started(self, endpoint: str, params: Dict[str, Any]):
+    def request_started(self, endpoint: str, params: dict[str, Any]):
         """Log API request started."""
         self.logger.debug(
             "api_request_started",
@@ -237,7 +237,7 @@ class APILogger:
             duration_ms=round(duration_ms, 2),
         )
 
-    def rate_limit_hit(self, endpoint: str, retry_after_s: Optional[float] = None):
+    def rate_limit_hit(self, endpoint: str, retry_after_s: float | None = None):
         """Log rate limit hit."""
         self.logger.warning(
             "api_rate_limit_hit",
@@ -322,7 +322,7 @@ class SessionLogger:
 
 # Global logger factory
 def create_structured_logger(
-    log_dir: Optional[Path] = None, enable_json: bool = False
+    log_dir: Path | None = None, enable_json: bool = False
 ) -> tuple[StructuredLogger, DownloadLogger, APILogger, SessionLogger]:
     """
     Create all structured loggers.

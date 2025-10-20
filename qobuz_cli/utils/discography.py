@@ -3,12 +3,12 @@ Utility for intelligently filtering an artist's discography to avoid duplicates.
 """
 
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 
 def smart_discography_filter(
-    items: List[Dict[str, Any]], skip_extras: bool = True
-) -> List[Dict[str, Any]]:
+    items: list[dict[str, Any]], skip_extras: bool = True
+) -> list[dict[str, Any]]:
     """
     Filters a list of album items to select the best version of each album.
 
@@ -25,9 +25,6 @@ def smart_discography_filter(
     if not items:
         return []
 
-    # --- THIS IS THE FIX ---
-    # The simple max-quality filter has been replaced with the more intelligent
-    # logic from the original codebase to better handle remasters and special editions.
     TYPE_REGEXES = {
         "remaster": re.compile(r"\b(re-?master(ed)?)\b", re.IGNORECASE),
         "extra": re.compile(
@@ -36,17 +33,17 @@ def smart_discography_filter(
         ),
     }
 
-    def is_type(album: Dict[str, Any], album_type: str) -> bool:
+    def is_type(album: dict[str, Any], album_type: str) -> bool:
         text = f"{album.get('title', '')} {album.get('version', '')}"
         return bool(TYPE_REGEXES[album_type].search(text))
 
-    def get_base_title(album: Dict[str, Any]) -> str:
+    def get_base_title(album: dict[str, Any]) -> str:
         title = album.get("title", "")
         # Remove content in parentheses/brackets for a cleaner base title
         return re.sub(r"[\(\[][^()\[\]]*[\)\]]", "", title).strip().lower()
 
     # Group albums by their base title
-    albums_by_title: Dict[str, List[Dict[str, Any]]] = {}
+    albums_by_title: dict[str, list[dict[str, Any]]] = {}
     requested_artist = items[0].get("artist", {}).get("name")
     for item in items:
         # Filter out albums where the primary artist doesn't match (e.g., features)

@@ -6,7 +6,6 @@ and compression support for optimal performance.
 import asyncio
 import logging
 import os
-from typing import Optional
 
 import aiofiles
 import aiohttp
@@ -17,29 +16,25 @@ from qobuz_cli.models.stats import DownloadStats
 
 log = logging.getLogger(__name__)
 
-_connection_pool: Optional[aiohttp.ClientSession] = None
+_connection_pool: aiohttp.ClientSession | None = None
 _pool_lock = asyncio.Lock()
-_pool_max_workers: int = 8  # Store the max_workers value
 
 
 async def get_connection_pool(max_workers: int = 8) -> aiohttp.ClientSession:
     """
     Gets or creates a shared aiohttp ClientSession for downloads.
 
+    This function ensures that only one connection pool is created for the
+    lifetime of the application run.
+
     Args:
-        max_workers: Maximum concurrent connections (should match config.max_workers)
+        max_workers: Maximum concurrent connections (should match config.max_workers).
     """
-    global _connection_pool, _pool_max_workers
+    global _connection_pool
     async with _pool_lock:
         if _connection_pool and not _connection_pool.closed:
-            # Only recreate if change is significant (>25%)
-            if _pool_max_workers > 0:
-                change_pct = abs(_pool_max_workers - max_workers) / _pool_max_workers
-                if change_pct < 0.25:
-                    return _connection_pool
-            await _connection_pool.close()
+            return _connection_pool
 
-        _pool_max_workers = max_workers
         connector = aiohttp.TCPConnector(
             limit=max_workers * 2,  # Total connections
             limit_per_host=max_workers,  # Per-host (Qobuz CDN)
@@ -102,13 +97,14 @@ class Downloader:
         url: str,
         destination_path: str,
         total_size_estimate: int,
-        stats: Optional[DownloadStats] = None,
-        progress_manager: Optional[ProgressManager] = None,
-        task_id: Optional[TaskID] = None,
+        stats: DownloadStats | None = None,
+        progress_manager: ProgressManager | None = None,
+        task_id: TaskID | None = None,
         max_workers: int = 8,
     ) -> None:
         """
-        Downloads a file from a URL with adaptive chunking, updating a Rich Progress instance.
+        Downloads a file from a URL with adaptive chunking, updating a Rich Progress
+        instance.
         """
         last_exception = None
         for attempt in range(1, self.max_attempts + 1):
@@ -173,7 +169,8 @@ class Downloader:
         """
         Downloads an asset (like a cover image or booklet) if it doesn't already exist.
         """
-        if os.path.isfile(destination_path):
+        path_exists = await asyncio.to_thread(os.path.isfile, destination_path)
+        if path_exists:
             return
 
         if use_original_quality:

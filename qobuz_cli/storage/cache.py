@@ -8,8 +8,10 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -19,13 +21,13 @@ class CacheManager:
     Manages a JSON-based file cache with TTL, periodic cleanup, and statistics tracking.
     """
 
-    MAX_CACHE_VALUE_KB = 500  # 500KB limit per cached item
+    MAX_CACHE_VALUE_KB = 500
 
     def __init__(
         self,
         cache_dir_path: Path,
-        max_age_days: int = 7,
-        stats_callback: Optional[Callable[[bool], None]] = None,
+        max_age_days: int = 1,
+        stats_callback: Callable[[bool], None] | None = None,
     ):
         """
         Initializes the cache manager.
@@ -33,13 +35,14 @@ class CacheManager:
         Args:
             cache_dir_path: The directory where cache files will be stored.
             max_age_days: The maximum age of a cache entry in days before it expires.
-            stats_callback: Optional callback to report cache hits (True) or misses (False).
+            stats_callback: Optional callback to report cache hits (True) or misses
+            (False).
         """
         self.cache_dir = cache_dir_path / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.max_age_seconds = max_age_days * 86400
         self._stats_callback = stats_callback
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start_background_cleanup(self):
         """Starts the periodic background cleanup task."""
@@ -52,7 +55,7 @@ class CacheManager:
         while True:
             try:
                 await asyncio.to_thread(self._cleanup_expired_entries)
-                await asyncio.sleep(3600)  # Sleep for 1 hour
+                await asyncio.sleep(3600)
             except asyncio.CancelledError:
                 log.debug("Cache cleanup task cancelled.")
                 break
@@ -64,15 +67,13 @@ class CacheManager:
         """Stops the background cleanup task gracefully."""
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
             log.debug("Stopped cache background cleanup task.")
 
     def _get_cache_path(self, key: str) -> Path:
         """Generates a safe filename for a given cache key."""
-        hashed_key = hashlib.md5(key.encode("utf-8")).hexdigest()
+        hashed_key = hashlib.md5(key.encode("utf-8")).hexdigest()  # noqa: S324
         return self.cache_dir / f"{hashed_key}.json"
 
     def _cleanup_expired_entries(self) -> None:
@@ -84,16 +85,17 @@ class CacheManager:
                 if now - cache_file.stat().st_mtime > self.max_age_seconds:
                     cache_file.unlink()
                     cleaned_count += 1
-            except (OSError, IOError) as e:
+            except OSError as e:
                 log.warning(
                     f"Failed to remove expired cache file {cache_file.name}: {e}"
                 )
         if cleaned_count > 0:
             log.debug(f"Cache cleanup: removed {cleaned_count} expired entries.")
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
-        Retrieves a value from the cache. Returns None if the key is not found or expired.
+        Retrieves a value from the cache. Returns None if the key is not found or
+        expired.
         """
         cache_path = self._get_cache_path(key)
 
@@ -109,12 +111,12 @@ class CacheManager:
                     self._stats_callback(False)
                 return None
 
-            with open(cache_path, "r", encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
                 if self._stats_callback:
                     self._stats_callback(True)
                 return data.get("value")
-        except (IOError, json.JSONDecodeError, OSError) as e:
+        except (json.JSONDecodeError, OSError) as e:
             log.debug(f"Cache read failed for key '{key}': {e}")
             if self._stats_callback:
                 self._stats_callback(False)
@@ -136,14 +138,15 @@ class CacheManager:
 
             if size_kb > self.MAX_CACHE_VALUE_KB:
                 log.debug(
-                    f"Cache value for key '{key}' is too large ({size_kb:.1f} KB), skipping."
+                    f"Cache value for key '{key}' is too large ({size_kb:.1f} KB), "
+                    "skipping."
                 )
                 return False
 
             with open(cache_path, "w", encoding="utf-8") as f:
                 f.write(serialized_payload)
             return True
-        except (IOError, TypeError, OSError) as e:
+        except (TypeError, OSError) as e:
             log.warning(f"Cache write failed for key '{key}': {e}")
             return False
 
@@ -154,6 +157,6 @@ class CacheManager:
             for cache_file in self.cache_dir.glob("*.json"):
                 cache_file.unlink()
             return True
-        except (OSError, IOError) as e:
+        except OSError as e:
             log.error(f"Failed to clear cache: {e}")
             return False

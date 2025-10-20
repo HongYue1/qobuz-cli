@@ -2,6 +2,7 @@
 Provides methods for checking the integrity of downloaded media files.
 """
 
+import asyncio
 import logging
 
 from mutagen.flac import FLAC, FLACNoHeaderError
@@ -73,3 +74,13 @@ class FileIntegrityChecker:
         except Exception as e:
             log.debug(f"MP3 check failed for '{filepath}' with unexpected error: {e}")
             return False
+
+    @staticmethod
+    async def check_flac_async(filepath: str) -> bool:
+        """Async wrapper for the FLAC integrity check."""
+        return await asyncio.to_thread(FileIntegrityChecker.check_flac, filepath)
+
+    @staticmethod
+    async def check_mp3_async(filepath: str) -> bool:
+        """Async wrapper for the MP3 integrity check."""
+        return await asyncio.to_thread(FileIntegrityChecker.check_mp3, filepath)

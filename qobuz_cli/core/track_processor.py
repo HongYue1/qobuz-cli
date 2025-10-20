@@ -6,8 +6,9 @@ import asyncio
 import logging
 import os
 from collections import OrderedDict
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from rich.markup import escape
 
@@ -25,7 +26,7 @@ log = logging.getLogger(__name__)
 
 class TrackProcessor:
     """
-    Orchestrates the download, tagging, and archiving of a single track.
+    Controls the download, tagging, and archiving of a single track.
     """
 
     def __init__(
@@ -49,7 +50,10 @@ class TrackProcessor:
         self._asset_lock_main = asyncio.Lock()
 
     async def _get_asset_lock(self, album_id: str) -> asyncio.Lock:
-        """Gets or creates a lock for a given album ID to prevent race conditions on asset downloads."""
+        """
+        Gets or creates a lock for a given album ID to prevent race conditions on asset
+        downloads.
+        """
         async with self._asset_lock_main:
             if album_id in self._asset_locks:
                 self._asset_locks.move_to_end(album_id)
@@ -66,12 +70,12 @@ class TrackProcessor:
 
     async def process_track(
         self,
-        track_meta: Dict[str, Any],
-        album_meta: Dict[str, Any],
-        track_url: Optional[str],
-        output_dir_override: Optional[Path] = None,
-        album_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        track_meta: dict[str, Any],
+        album_meta: dict[str, Any],
+        track_url: str | None,
+        output_dir_override: Path | None = None,
+        album_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """
         Manages the complete lifecycle of downloading and saving a track.
         """
@@ -87,8 +91,13 @@ class TrackProcessor:
 
         # Handle output directory override
         if output_dir_override:
-            # CORRECTED LOGIC: Preserve the entire template-generated sub-path
-            final_path = output_dir_override / full_formatted_path
+            if (
+                full_formatted_path.parts
+                and output_dir_override.name == full_formatted_path.parts[0]
+            ):
+                final_path = output_dir_override / Path(*full_formatted_path.parts[1:])
+            else:
+                final_path = output_dir_override / full_formatted_path
         else:
             final_path = full_formatted_path
 
@@ -107,7 +116,8 @@ class TrackProcessor:
             self.stats.tracks_downloaded += 1
             # Use console.print to ensure it appears above the Live display
             self.progress_manager.console.print(
-                f"  [cyan]→ (Dry Run)[/] Would save to [dim]{escape(str(final_path))}[/dim]"
+                f"  [cyan]→ (Dry Run)[/] Would save to [dim]{escape(str(final_path))}"
+                "[/dim]"
             )
             # Increment skipped for progress tracking
             self.progress_manager.increment_skipped()
@@ -119,32 +129,35 @@ class TrackProcessor:
             if album_id_str:
                 cover_path = final_dir / "cover.jpg"
                 # First check (outside lock) for performance
-                if not cover_path.exists():
+                path_exists = await asyncio.to_thread(cover_path.exists)
+                if not path_exists:
                     cover_lock = await self._get_asset_lock(album_id_str)
                     async with cover_lock:
                         # Second check (inside lock) to prevent race condition
-                        if not cover_path.exists():
-                            if cover_url := album_meta.get("image", {}).get("large"):
-                                log.debug(
-                                    f"Downloading cover for album ID {album_id_str}"
-                                )
-                                await self.downloader.download_asset(
-                                    cover_url,
-                                    str(cover_path),
-                                    self.config.og_cover,
-                                    self.config.max_workers,
-                                )
+                        path_exists_locked = await asyncio.to_thread(cover_path.exists)
+                        if not path_exists_locked and (
+                            cover_url := album_meta.get("image", {}).get("large")
+                        ):
+                            log.debug(f"Downloading cover for album ID {album_id_str}")
+                            await self.downloader.download_asset(
+                                cover_url,
+                                str(cover_path),
+                                self.config.og_cover,
+                                self.config.max_workers,
+                            )
 
         if not track_url:
             self.stats.tracks_failed += 1
             log.error(f"  [red]✗ Failed:[/] {track_display_title} (No download URL)")
             return None
 
-        if final_path.is_file():
+        path_is_file = await asyncio.to_thread(final_path.is_file)
+        if path_is_file:
             self.stats.tracks_skipped_exists += 1
             self.progress_manager.increment_skipped()
             log.info(
-                f"  [yellow]○ Skipping:[/] [dim]{escape(final_path.name)}[/dim] (already exists)"
+                f"  [yellow]○ Skipping:[/] [dim]{escape(final_path.name)}[/dim]"
+                " (already exists)"
             )
             return None
 
@@ -182,20 +195,27 @@ class TrackProcessor:
                 max_workers=self.config.max_workers,
             )
 
-            self.tagger.tag_file(
-                str(temp_path), str(final_path), track_meta, album_meta, is_mp3
+            await asyncio.to_thread(
+                self.tagger.tag_file,
+                str(temp_path),
+                str(final_path),
+                track_meta,
+                album_meta,
+                is_mp3,
             )
 
-            if not (
-                FileIntegrityChecker.check_mp3(str(final_path))
+            is_valid = await (
+                FileIntegrityChecker.check_mp3_async(str(final_path))
                 if is_mp3
-                else FileIntegrityChecker.check_flac(str(final_path))
-            ):
+                else FileIntegrityChecker.check_flac_async(str(final_path))
+            )
+            if not is_valid:
                 raise FileIntegrityError("Downloaded file failed integrity check.")
 
             self.stats.tracks_downloaded += 1
-            if final_path.exists():
-                downloaded_size = final_path.stat().st_size
+            final_path_exists = await asyncio.to_thread(final_path.exists)
+            if final_path_exists:
+                downloaded_size = (await asyncio.to_thread(final_path.stat)).st_size
                 self.stats.total_size_downloaded += downloaded_size
 
             self.progress_manager.remove_task(task_id, success=True)
@@ -212,8 +232,7 @@ class TrackProcessor:
             )
             return None
         finally:
-            if temp_path.exists():
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+            temp_path_exists = await asyncio.to_thread(temp_path.exists)
+            if temp_path_exists:
+                with suppress(OSError):
+                    await asyncio.to_thread(os.remove, temp_path)

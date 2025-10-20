@@ -5,7 +5,7 @@ Handles parsing of Qobuz metadata and writing it as tags to media files.
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar
 
 import mutagen.id3 as id3
 from mutagen.flac import FLAC, Picture
@@ -17,7 +17,8 @@ log = logging.getLogger(__name__)
 
 # --- Constants ---
 COPYRIGHT, PHON_COPYRIGHT = "\u00a9", "\u2117"
-FLAC_MAX_BLOCKSIZE = 16777215  # ~16.7MB, max size for a FLAC metadata block
+# 2^(24 bit) - 1 = 16777215 bytes, max size for a FLAC metadata block
+FLAC_MAX_BLOCKSIZE = 16777215  # ~16.7MB
 
 
 class PerformersParser:
@@ -26,7 +27,7 @@ class PerformersParser:
     to extract artists by role.
     """
 
-    ROLE_MAPPING = {
+    ROLE_MAPPING: ClassVar[dict[str, str]] = {
         "mainartist": "Main",
         "performer": "Main",
         "featuredartist": "Featured",
@@ -41,17 +42,15 @@ class PerformersParser:
         "musicpublisher": "Publisher",
     }
 
-    def __init__(
-        self, performers_string: Optional[str], track_title: Optional[str] = None
-    ):
-        self._performers: Dict[str, List[str]] = {}
+    def __init__(self, performers_string: str | None, track_title: str | None = None):
+        self._performers: dict[str, list[str]] = {}
         if performers_string:
             self._parse_string(performers_string)
         if track_title:
             self._parse_title(track_title)
 
     def _parse_string(self, performers_string: str):
-        person_to_roles: Dict[str, List[str]] = {}
+        person_to_roles: dict[str, list[str]] = {}
         for person_chunk in performers_string.split(" - "):
             parts = [p.strip() for p in person_chunk.split(",")]
             if len(parts) < 2:
@@ -63,9 +62,10 @@ class PerformersParser:
         for name, roles in person_to_roles.items():
             for role_raw in roles:
                 role_key = role_raw.replace(" ", "").lower()
-                if standard_role := self.ROLE_MAPPING.get(role_key):
-                    if name not in self._performers.setdefault(standard_role, []):
-                        self._performers[standard_role].append(name)
+                if (standard_role := self.ROLE_MAPPING.get(role_key)) and (
+                    name not in self._performers.setdefault(standard_role, [])
+                ):
+                    self._performers[standard_role].append(name)
 
     def _parse_title(self, title: str):
         """Extracts featured artists from the title and adds them to the parser."""
@@ -85,10 +85,10 @@ class PerformersParser:
             if artist not in current_featured:
                 current_featured.append(artist)
 
-    def get_performers_by_role(self, role: str) -> List[str]:
+    def get_performers_by_role(self, role: str) -> list[str]:
         return self._performers.get(role, [])
 
-    def get_primary_artists(self) -> List[str]:
+    def get_primary_artists(self) -> list[str]:
         return self.get_performers_by_role("Main")
 
 
@@ -102,8 +102,8 @@ class Tagger:
         self,
         temp_file_path: str,
         final_file_path: str,
-        track_meta: Dict[str, Any],
-        album_meta: Dict[str, Any],
+        track_meta: dict[str, Any],
+        album_meta: dict[str, Any],
         is_mp3: bool,
     ) -> bool:
         try:
@@ -122,8 +122,8 @@ class Tagger:
             return False
 
     def _get_common_tags(
-        self, track_meta: Dict[str, Any], album_meta: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, track_meta: dict[str, Any], album_meta: dict[str, Any]
+    ) -> dict[str, Any]:
         """Gathers and formats tags common to both MP3 and FLAC."""
         parser = PerformersParser(track_meta.get("performers"), track_meta.get("title"))
 
@@ -166,7 +166,7 @@ class Tagger:
         }
 
     def _tag_flac(
-        self, temp_path: str, final_path: str, track_meta: Dict, album_meta: Dict
+        self, temp_path: str, final_path: str, track_meta: dict, album_meta: dict
     ):
         audio = FLAC(temp_path)
         tags = self._get_common_tags(track_meta, album_meta)
@@ -187,7 +187,7 @@ class Tagger:
         audio.save()
 
     def _tag_mp3(
-        self, temp_path: str, final_path: str, track_meta: Dict, album_meta: Dict
+        self, temp_path: str, final_path: str, track_meta: dict, album_meta: dict
     ):
         try:
             audio = id3.ID3(temp_path)

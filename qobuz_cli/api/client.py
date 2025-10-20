@@ -5,7 +5,8 @@ Enhanced API client with compression for metadata and circuit breaker protection
 import hashlib
 import logging
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import aiohttp
 
@@ -36,24 +37,25 @@ class QobuzAPIClient:
 
     BASE_URL = "https://www.qobuz.com/api.json/0.2/"
 
-    def __init__(self, app_id: str, secrets: List[str], max_workers: int = 8):
+    def __init__(self, app_id: str, secrets: list[str], max_workers: int = 8):
         """
         Initializes the API client.
 
         Args:
             app_id: 9-digit Qobuz application ID from the web player.
             secrets: List of potential app secrets scraped from the web player.
-            max_workers: The number of concurrent workers, used to tune the connection pool.
+            max_workers: The number of concurrent workers, used to tune the
+            connection pool.
         """
         self.app_id: str = str(app_id)
-        self.secrets: List[str] = secrets
+        self.secrets: list[str] = secrets
         self.max_workers = max_workers
 
         # State set by the authenticator
-        self.app_secret: Optional[str] = None
-        self.user_auth_token: Optional[str] = None
+        self.app_secret: str | None = None
+        self.user_auth_token: str | None = None
 
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._rate_limiter = AdaptiveRateLimiter()
         self._authenticator = QobuzAuthenticator(self)
 
@@ -81,7 +83,8 @@ class QobuzAPIClient:
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0)"
+                    " Gecko/20100101 Firefox/121.0",
                     "X-App-Id": self.app_id,
                     # Enable compression for JSON metadata responses
                     "Accept-Encoding": "gzip, deflate, br",
@@ -95,8 +98,8 @@ class QobuzAPIClient:
             await self._session.close()
 
     def _prepare_get_file_url_params(
-        self, track_id: str, format_id: int, secret_override: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, track_id: str, format_id: int, secret_override: str | None = None
+    ) -> dict[str, Any]:
         """
         Builds the signed parameter dictionary for the 'track/getFileUrl' endpoint.
         """
@@ -112,8 +115,11 @@ class QobuzAPIClient:
                 "App secret has not been configured. Cannot sign request."
             )
 
-        sig_str = f"trackgetFileUrlformat_id{format_id}intentstreamtrack_id{track_id}{unix_ts}{secret}"
-        request_sig = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+        sig_str = (
+            f"trackgetFileUrlformat_id{format_id}intentstreamtrack_id"
+            f"{track_id}{unix_ts}{secret}"
+        )
+        request_sig = hashlib.md5(sig_str.encode("utf-8")).hexdigest()  # noqa: S324
 
         return {
             "request_ts": unix_ts,
@@ -123,9 +129,10 @@ class QobuzAPIClient:
             "intent": "stream",
         }
 
-    async def api_call(self, endpoint: str, **kwargs: Any) -> Dict[str, Any]:
+    async def api_call(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """
-        Makes an authenticated API call with rate limiting, retry logic, and circuit breaker.
+        Makes an authenticated API call with rate limiting, retry logic, and
+        circuit breaker.
 
         Compression is automatically applied to JSON responses by aiohttp when
         the server sends Content-Encoding header.
@@ -149,13 +156,9 @@ class QobuzAPIClient:
                 if self.user_auth_token:
                     params["user_auth_token"] = self.user_auth_token
 
-                start_time = time.monotonic()
-
                 async with self._session.get(
                     self.BASE_URL + endpoint, params=params
                 ) as r:
-                    duration_ms = (time.monotonic() - start_time) * 1000
-
                     # Check if response was compressed (for logging)
                     was_compressed = r.headers.get("Content-Encoding") in (
                         "gzip",
@@ -164,7 +167,8 @@ class QobuzAPIClient:
                     )
                     if was_compressed:
                         log.debug(
-                            f"API response for {endpoint} was compressed ({r.headers.get('Content-Encoding')})"
+                            f"API response for {endpoint} was compressed "
+                            f"({r.headers.get('Content-Encoding')})"
                         )
 
                     if r.status == 429:
@@ -194,7 +198,7 @@ class QobuzAPIClient:
 
     async def _yield_paginated(
         self, endpoint: str, item_key: str, **kwargs: Any
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Generator for handling paginated API endpoints.
         """
@@ -221,35 +225,35 @@ class QobuzAPIClient:
                 break
 
     # Public API Methods
-    async def fetch_album_metadata(self, album_id: str) -> Dict[str, Any]:
+    async def fetch_album_metadata(self, album_id: str) -> dict[str, Any]:
         return await self.api_call("album/get", album_id=album_id)
 
-    async def fetch_track_metadata(self, track_id: str) -> Dict[str, Any]:
+    async def fetch_track_metadata(self, track_id: str) -> dict[str, Any]:
         return await self.api_call("track/get", track_id=track_id)
 
-    async def fetch_track_url(self, track_id: str, format_id: int) -> Dict[str, Any]:
+    async def fetch_track_url(self, track_id: str, format_id: int) -> dict[str, Any]:
         return await self.api_call("track/getFileUrl", id=track_id, fmt_id=format_id)
 
     def fetch_artist_discography(
         self, artist_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "artist/get", item_key="albums", artist_id=artist_id, extra="albums"
         )
 
     def fetch_playlist_tracks(
         self, playlist_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "playlist/get", item_key="tracks", playlist_id=playlist_id, extra="tracks"
         )
 
     def fetch_label_discography(
         self, label_id: str
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "label/get", item_key="albums", label_id=label_id, extra="albums"
         )
 
-    async def search_tracks(self, query: str, limit: int = 50) -> Dict[str, Any]:
+    async def search_tracks(self, query: str, limit: int = 50) -> dict[str, Any]:
         return await self.api_call("track/search", query=query, limit=limit)

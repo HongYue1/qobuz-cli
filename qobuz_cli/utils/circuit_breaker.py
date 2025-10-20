@@ -7,7 +7,6 @@ import asyncio
 import logging
 import time
 from enum import Enum
-from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -22,8 +21,6 @@ class CircuitState(Enum):
 
 class CircuitBreakerError(Exception):
     """Raised when circuit breaker is open."""
-
-    pass
 
 
 class CircuitBreaker:
@@ -57,7 +54,7 @@ class CircuitBreaker:
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
-        self._last_failure_time: Optional[float] = None
+        self._last_failure_time: float | None = None
         self._lock = asyncio.Lock()
 
     @property

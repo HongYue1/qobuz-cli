@@ -4,14 +4,14 @@ Utilities for handling file paths, templates, and URL parsing.
 
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from pathvalidate import sanitize_filename, sanitize_filepath
 
 from qobuz_cli.utils.formatting import get_track_title
 
 
-def parse_qobuz_url(url: str) -> Optional[Tuple[str, str]]:
+def parse_qobuz_url(url: str) -> tuple[str, str] | None:
     """
     Parses a Qobuz URL to extract the content type and ID.
     Handles multiple URL formats.
@@ -43,8 +43,8 @@ class PathFormatter:
 
     def format_path(
         self,
-        track_meta: Dict[str, Any],
-        album_meta: Dict[str, Any],
+        track_meta: dict[str, Any],
+        album_meta: dict[str, Any],
         file_extension: str,
     ) -> Path:
         """
@@ -56,7 +56,7 @@ class PathFormatter:
         return Path(sanitize_filepath(final_str, platform="auto"))
 
     def _resolve_conditionals(
-        self, template_str: str, variables: Dict[str, Any]
+        self, template_str: str, variables: dict[str, Any]
     ) -> str:
         pattern = re.compile(r"%\{\?(\w+),([^|]*?)\|([^}]*?)\}")
 
@@ -67,8 +67,8 @@ class PathFormatter:
         return pattern.sub(replacer, template_str)
 
     def _get_template_vars(
-        self, track_meta: Dict[str, Any], album_meta: Dict[str, Any], ext: str
-    ) -> Dict[str, Any]:
+        self, track_meta: dict[str, Any], album_meta: dict[str, Any], ext: str
+    ) -> dict[str, Any]:
         """Builds the variable dictionary for template formatting."""
         from qobuz_cli.media.tagger import PerformersParser
 

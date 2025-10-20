@@ -1,5 +1,5 @@
 """
-The main orchestrator for handling URLs, fetching metadata, and managing the download queue.
+The main logic for handling URLs, fetching metadata, and managing the download queue.
 """
 
 import asyncio
@@ -8,8 +8,9 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup
 from rich.markup import escape
@@ -34,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 class DownloadManager:
-    """Orchestrates the entire download process."""
+    """Controls the entire download process."""
 
     def __init__(
         self,
@@ -90,7 +91,7 @@ class DownloadManager:
                 }
                 json.dump(session_data, f)
                 f.write("\n")
-        except IOError as e:
+        except OSError as e:
             log.warning(f"[yellow]Could not save session stats:[/] {e}")
 
     async def execute_downloads(self):
@@ -103,16 +104,16 @@ class DownloadManager:
 
             expanded_urls = []
             for source in self.config.source_urls:
-                if Path(source).is_file():
+                is_a_file = await asyncio.to_thread(Path(source).is_file)
+                if is_a_file:
                     log.info(f"Reading URLs from file: [dim]{source}[/dim]")
                     try:
-                        with open(source, "r", encoding="utf-8") as f:
-                            expanded_urls.extend(
-                                line.strip()
-                                for line in f
-                                if line.strip() and not line.startswith("#")
-                            )
-                    except (IOError, UnicodeDecodeError) as e:
+                        async with aiofiles.open(source, encoding="utf-8") as f:
+                            async for line in f:
+                                stripped_line = line.strip()
+                                if stripped_line and not stripped_line.startswith("#"):
+                                    expanded_urls.append(stripped_line)
+                    except (OSError, UnicodeDecodeError) as e:
                         log.error(f"[red]Could not read file {source}: {e}[/red]")
                 else:
                     expanded_urls.append(source)
@@ -171,13 +172,14 @@ class DownloadManager:
             )
 
     async def _process_album(
-        self, album_id: str, output_dir_override: Optional[Path] = None
+        self, album_id: str, output_dir_override: Path | None = None
     ):
         """Downloads a full album with batch URL fetching."""
         async with self._processed_ids_lock:
             if album_id in self._processed_album_ids:
                 self.track_processor.progress_manager.log_message(
-                    f"Album ID '{escape(album_id)}' has already been processed. Skipping."
+                    f"Album ID '{escape(album_id)}' has already been processed."
+                    " Skipping."
                 )
                 return
             self._processed_album_ids.add(album_id)
@@ -198,7 +200,8 @@ class DownloadManager:
 
         if not album_meta.get("streamable", False):
             self.track_processor.progress_manager.log_message(
-                f"[yellow]⚠ Album '{escape(album_meta.get('title', album_id))}' is not available for streaming. Skipping.[/yellow]",
+                f"[yellow]⚠ Album '{escape(album_meta.get('title', album_id))}'"
+                " is not available for streaming. Skipping.[/yellow]",
                 level="warning",
             )
             self.stats.albums_skipped = getattr(self.stats, "albums_skipped", 0) + 1
@@ -248,7 +251,8 @@ class DownloadManager:
                 album_id, skipped_count
             )
             self.track_processor.progress_manager.log_message(
-                f"  [yellow]○ Skipped {skipped_count} tracks (already in archive).[/yellow]",
+                f"  [yellow]○ Skipped {skipped_count} tracks (already in archive)"
+                ".[/yellow]",
                 level="info",
             )
 
@@ -260,7 +264,7 @@ class DownloadManager:
             ]
             url_results = await asyncio.gather(*url_tasks, return_exceptions=True)
             tasks = []
-            for track, url_data in zip(processable_tracks, url_results):
+            for track, url_data in zip(processable_tracks, url_results, strict=True):
                 if isinstance(url_data, Exception):
                     self.stats.tracks_failed += 1
                     log.error(f"Failed to get URL for track {track['id']}: {url_data}")
@@ -306,7 +310,8 @@ class DownloadManager:
             self.stats.tracks_skipped_archive += 1
             self.track_processor.progress_manager.increment_skipped()
             self.track_processor.progress_manager.log_message(
-                f"[yellow]Skipping track '{escape(track_meta['title'])}' (already in archive).[/yellow]",
+                f"[yellow]Skipping track '{escape(track_meta['title'])}'"
+                " (already in archive).[/yellow]",
                 level="warning",
             )
             return
@@ -320,7 +325,9 @@ class DownloadManager:
         await self._get_and_process_track(track_meta, album_meta)
 
     async def _process_artist(self, artist_id: str):
-        """Downloads the discography of an artist, streaming albums to conserve memory."""
+        """
+        Downloads the discography of an artist, streaming albums to conserve memory.
+        """
         artist_discography_gen = self.api_client.fetch_artist_discography(artist_id)
         try:
             first_page = await anext(artist_discography_gen)
@@ -347,7 +354,8 @@ class DownloadManager:
                 all_albums.extend(page.get("albums", {}).get("items", []))
 
             self.track_processor.progress_manager.log_message(
-                f"  [dim]Applying smart discography filter to {len(all_albums)} albums...[/dim]"
+                f"  [dim]Applying smart discography filter to {len(all_albums)} "
+                "albums...[/dim]"
             )
             filtered_albums = await asyncio.to_thread(
                 smart_discography_filter, all_albums
@@ -376,8 +384,8 @@ class DownloadManager:
     async def _process_playlist(
         self,
         playlist_id: str,
-        lastfm_title: Optional[str] = None,
-        track_ids_override: Optional[List[str]] = None,
+        lastfm_title: str | None = None,
+        track_ids_override: list[str] | None = None,
     ):
         """Downloads a playlist."""
         async with self._processed_ids_lock:
@@ -453,12 +461,12 @@ class DownloadManager:
 
     async def _get_and_process_track(
         self,
-        track_meta: Dict[str, Any],
-        album_meta: Dict[str, Any],
-        output_dir_override: Optional[Path] = None,
-        album_id: Optional[str] = None,
-        track_url_data: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        track_meta: dict[str, Any],
+        album_meta: dict[str, Any],
+        output_dir_override: Path | None = None,
+        album_id: str | None = None,
+        track_url_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Fetches a track's download URL and passes it to the TrackProcessor.
         """
@@ -486,7 +494,8 @@ class DownloadManager:
 
                 if quality_restricted and self.config.no_fallback:
                     log.warning(
-                        f"  [yellow]Skipping track '{escape(track_meta['title'])}': requested quality not available.[/yellow]"
+                        f"  [yellow]Skipping track '{escape(track_meta['title'])}': "
+                        "requested quality not available.[/yellow]"
                     )
                     self.stats.tracks_skipped_quality += 1
                     self.track_processor.progress_manager.increment_skipped()
@@ -508,24 +517,27 @@ class DownloadManager:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 self.stats.tracks_failed += 1
                 log.error(
-                    f"[red]  ✗ Network error for track '{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]"
+                    "[red]  ✗ Network error for track "
+                    f"'{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]"
                 )
             except QobuzCliError as e:
                 self.stats.tracks_failed += 1
                 log.error(
-                    f"[red]  ✗ API error for track '{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]"
+                    "[red]  ✗ API error for track "
+                    f"'{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]"
                 )
             except Exception as e:
                 self.stats.tracks_failed += 1
                 log.error(
-                    f"[red]  ✗ An unexpected error occurred for track '{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]",
+                    "[red]  ✗ An unexpected error occurred for track "
+                    f"'{escape(track_meta.get('title', 'Unknown'))}': {e}[/red]",
                     exc_info=log.getEffectiveLevel() == logging.DEBUG,
                 )
             # A failure here should still count toward album progress
             self.track_processor.progress_manager.increment_album_progress(album_id)
             return None
 
-    async def _search_for_track_id(self, query: str) -> Optional[str]:
+    async def _search_for_track_id(self, query: str) -> str | None:
         """Searches Qobuz for a track and returns its ID."""
         cache_key = f"search_{query}"
         if self.cache and (cached_id := self.cache.get(cache_key)):
@@ -543,14 +555,18 @@ class DownloadManager:
         return None
 
     async def _process_lastfm_playlist(self, url: str):
-        """Fetches a Last.fm playlist, searches for tracks on Qobuz, and downloads them."""
+        """
+        Fetches a Last.fm playlist, searches for tracks on Qobuz, and downloads them.
+        """
         log.info(f"Processing Last.fm playlist: [dim]{url}[/dim]")
         try:
             timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    html = await response.text()
+            async with (
+                aiohttp.ClientSession(timeout=timeout) as session,
+                session.get(url) as response,
+            ):
+                response.raise_for_status()
+                html = await response.text()
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             log.error(f"[red]Failed to fetch Last.fm playlist: {e}[/red]")
             return
@@ -567,7 +583,9 @@ class DownloadManager:
             log.warning("[yellow]No tracks found on Last.fm page.[/yellow]")
             return
 
-        search_queries = [f"{artist} {title}" for artist, title in zip(artists, titles)]
+        search_queries = [
+            f"{artist} {title}" for artist, title in zip(artists, titles, strict=True)
+        ]
         log.info(f"Found {len(search_queries)} tracks. Searching for them on Qobuz...")
 
         search_tasks = [self._search_for_track_id(q) for q in search_queries]
@@ -579,7 +597,8 @@ class DownloadManager:
 
         found_ratio = (len(track_ids) / len(search_queries)) * 100
         log.info(
-            f"Found {len(track_ids)}/{len(search_queries)} matching tracks on Qobuz ({found_ratio:.0f}%)."
+            f"Found {len(track_ids)}/{len(search_queries)} matching tracks on Qobuz "
+            f"({found_ratio:.0f}%)."
         )
 
         await self._process_playlist(

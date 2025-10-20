@@ -2,7 +2,7 @@
 Helper functions for formatting data into human-readable strings.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 
 def format_size(bytes_size: int) -> str:
@@ -18,7 +18,9 @@ def format_size(bytes_size: int) -> str:
 
 
 def format_duration(seconds: float) -> str:
-    """Formats a duration in seconds into a human-readable string (e.g., '2h 34m 12s')."""
+    """
+    Formats a duration in seconds into a human-readable string (e.g., '2h 34m 12s').
+    """
     s = int(seconds)
     hours, remainder = divmod(s, 3600)
     minutes, secs = divmod(remainder, 60)
@@ -32,16 +34,17 @@ def format_duration(seconds: float) -> str:
     return " ".join(parts)
 
 
-def get_track_title(track_meta: Dict[str, Any]) -> str:
+def get_track_title(track_meta: dict[str, Any]) -> str:
     """Constructs a full track title including its version, if available."""
     title = track_meta.get("title", "Unknown Title")
-    if version := track_meta.get("version"):
-        if version.lower() not in title.lower():
-            title = f"{title} ({version})"
+    if (version := track_meta.get("version")) and version.lower() not in title.lower():
+        title = f"{title} ({version})"
     return title
 
 
-def extract_artist_name(api_response: Dict[str, Any], fallback_id: str = None) -> str:
+def extract_artist_name(
+    api_response: dict[str, Any], fallback_id: str | None = None
+) -> str:
     """
     Extracts an artist's name from various possible API response structures.
 
@@ -54,10 +57,12 @@ def extract_artist_name(api_response: Dict[str, Any], fallback_id: str = None) -
     """
     if name := api_response.get("name"):
         return name
-    if artist := api_response.get("artist"):
-        if name := artist.get("name"):
-            return name
-    if albums := api_response.get("albums", {}).get("items"):
-        if albums and (artist := albums[0].get("artist", {}).get("name")):
-            return artist
+    if (artist := api_response.get("artist")) and (name := artist.get("name")):
+        return name
+    if (
+        (albums := api_response.get("albums", {}).get("items"))
+        and albums
+        and (artist := albums[0].get("artist", {}).get("name"))
+    ):
+        return artist
     return f"Artist ID {fallback_id or api_response.get('id', 'Unknown')}"

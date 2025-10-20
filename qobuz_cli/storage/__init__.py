@@ -9,4 +9,4 @@ from .archive import TrackArchive
 from .cache import CacheManager
 from .config_manager import ConfigManager
 
-__all__ = ["ConfigManager", "TrackArchive", "CacheManager"]
+__all__ = ["CacheManager", "ConfigManager", "TrackArchive"]

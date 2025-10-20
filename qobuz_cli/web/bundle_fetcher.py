@@ -8,7 +8,6 @@ import base64
 import logging
 import re
 from collections import OrderedDict
-from typing import Dict
 
 import aiohttp
 
@@ -25,7 +24,10 @@ _APP_ID_REGEX = re.compile(r'production:{api:{appId:"(?P<app_id>\d{9})"')
 _SEED_TIMEZONE_REGEX = re.compile(
     r'[a-z]\.initialSeed\("(?P<seed>[\w=]+)",window\.utimezone\.(?P<timezone>[a-z]+)\)'
 )
-_INFO_EXTRAS_TEMPLATE = r'name:"\w+/(?P<timezone>{timezones})",info:"(?P<info>[\w=]+)",extras:"(?P<extras>[\w=]+)"'
+_INFO_EXTRAS_TEMPLATE = (
+    r'name:"\w+/(?P<timezone>{timezones})",'
+    r'info:"(?P<info>[\w=]+)",extras:"(?P<extras>[\w=]+)"'
+)
 
 
 class BundleFetcher:
@@ -96,7 +98,7 @@ class BundleFetcher:
         log.debug(f"Extracted App ID: {app_id}")
         return app_id
 
-    def extract_secrets(self) -> Dict[str, str]:
+    def extract_secrets(self) -> dict[str, str]:
         """Extracts and decodes the API secrets from the bundle."""
         log.debug("Extracting secrets from bundle...")
 

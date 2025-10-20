@@ -5,7 +5,7 @@ Allows external tools to validate configs and provides better error messages.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # JSON Schema for qobuz-cli configuration
 CONFIG_SCHEMA = {
@@ -101,7 +101,7 @@ CONFIG_SCHEMA = {
 }
 
 
-def validate_config_schema(config_dict: Dict[str, Any]) -> tuple[bool, List[str]]:
+def validate_config_schema(config_dict: dict[str, Any]) -> tuple[bool, list[str]]:
     """
     Validate configuration against JSON schema.
 
@@ -112,7 +112,6 @@ def validate_config_schema(config_dict: Dict[str, Any]) -> tuple[bool, List[str]
         Tuple of (is_valid, error_messages)
     """
     try:
-        import jsonschema
         from jsonschema import Draft7Validator
 
         validator = Draft7Validator(CONFIG_SCHEMA)
@@ -129,7 +128,6 @@ def validate_config_schema(config_dict: Dict[str, Any]) -> tuple[bool, List[str]
         return False, error_messages
 
     except ImportError:
-        # jsonschema not installed, skip validation
         return True, ["Warning: jsonschema not installed, skipping schema validation"]
 
 
@@ -145,7 +143,7 @@ def export_schema(output_path: Path) -> None:
         json.dump(CONFIG_SCHEMA, f, indent=2)
 
 
-def validate_output_template(template: str) -> tuple[bool, Optional[str]]:
+def validate_output_template(template: str) -> tuple[bool, str | None]:
     """
     Validate output template has required placeholders.
 
@@ -167,7 +165,8 @@ def validate_output_template(template: str) -> tuple[bool, Optional[str]]:
     if not has_required:
         return (
             False,
-            f"Template must contain at least one of: {', '.join(required_placeholders)}",
+            "Template must contain at least one "
+            f"of: {', '.join(required_placeholders)}",
         )
 
     # Check for invalid characters
@@ -179,7 +178,7 @@ def validate_output_template(template: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def validate_quality_conflicts(config: Dict[str, Any]) -> tuple[bool, List[str]]:
+def validate_quality_conflicts(config: dict[str, Any]) -> tuple[bool, list[str]]:
     """
     Check for conflicting quality/cover settings.
 
@@ -204,7 +203,8 @@ def validate_quality_conflicts(config: Dict[str, Any]) -> tuple[bool, List[str]]
 
     if no_fallback and quality in [7, 27]:
         errors.append(
-            "Warning: no_fallback=true with Hi-Res quality may cause many skipped tracks"
+            "Warning: no_fallback=true with Hi-Res quality "
+            "may cause many skipped tracks"
         )
 
     return len(errors) == 0, errors

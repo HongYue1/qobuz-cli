@@ -9,4 +9,4 @@ from .downloader import Downloader
 from .integrity import FileIntegrityChecker
 from .tagger import Tagger
 
-__all__ = ["Downloader", "Tagger", "FileIntegrityChecker"]
+__all__ = ["Downloader", "FileIntegrityChecker", "Tagger"]

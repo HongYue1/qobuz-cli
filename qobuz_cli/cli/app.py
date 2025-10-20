@@ -10,12 +10,12 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
 
+from qobuz_cli import __version__
 from qobuz_cli.api.client import QobuzAPIClient
 from qobuz_cli.core.download_manager import DownloadManager
 from qobuz_cli.exceptions import QobuzCliError
@@ -86,7 +86,7 @@ def main_callback(
 ):
     """Qobuz Downloader CLI"""
     if version:
-        console.print("[bold]qobuz-cli[/bold] version [cyan]0.1.0-refactored[/cyan]")
+        console.print(f"[bold]qobuz-cli[/bold] version [cyan]{__version__}[/cyan]")
         raise typer.Exit()
 
     log_level = "INFO"
@@ -105,7 +105,8 @@ def main_callback(
 
         if cache.clear():
             console.print(
-                f"[green]✓ Cache cleared successfully ({files_count} entries removed).[/green]"
+                f"[green]✓ Cache cleared successfully ({files_count} entries removed"
+                ").[/green]"
             )
         else:
             console.print("[red]✗ Failed to clear cache.[/red]")
@@ -114,7 +115,8 @@ def main_callback(
     if show_config:
         if not CONFIG_FILE.is_file():
             console.print(
-                f"[red]✗ Config file not found.[/] Run [cyan]qobuz-cli init[/cyan] first."
+                "[red]✗ Config file not found.[/] Run [cyan]qobuz-cli init[/cyan]"
+                " first."
             )
             raise typer.Exit(code=1)
         config_manager = ConfigManager(CONFIG_FILE)
@@ -128,7 +130,7 @@ def main_callback(
 
 @app.command()
 def init(
-    credentials: List[str] = typer.Argument(
+    credentials: list[str] = typer.Argument(  # noqa: B008
         ...,
         help="Authentication token OR email and password.",
         metavar="<TOKEN> | <EMAIL> <PASSWORD>",
@@ -138,9 +140,12 @@ def init(
     ),
 ):
     """🔧 Initialize configuration with Qobuz credentials."""
-    if CONFIG_FILE.exists() and not force:
-        if not typer.confirm("Configuration file already exists. Overwrite?"):
-            raise typer.Abort()
+    if (
+        CONFIG_FILE.exists()
+        and not force
+        and not typer.confirm("Configuration file already exists. Overwrite?")
+    ):
+        raise typer.Abort()
 
     async def _init_async():
         console.print("\n[cyan]Fetching API secrets from Qobuz web player...[/cyan]")
@@ -151,18 +156,19 @@ def init(
             console.print("[green]✓ Secrets fetched successfully.[/green]")
         except Exception as e:
             console.print(f"[red]✗ Failed to fetch secrets: {e}[/red]")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
         settings = {"app_id": app_id, "secrets": secrets}
         if len(credentials) == 1:
             settings["token"] = credentials[0]
             console.print("[green]✓ Using token authentication.[/green]")
         elif len(credentials) == 2:
             settings["email"] = credentials[0]
-            settings["password"] = hashlib.md5(credentials[1].encode()).hexdigest()
+            settings["password"] = hashlib.md5(credentials[1].encode()).hexdigest()  # noqa: S324
             console.print("[green]✓ Using email/password authentication.[/green]")
         else:
             console.print(
-                "[red]✗ Invalid credentials provided. Use a token or email + password.[/red]"
+                "[red]✗ Invalid credentials provided. "
+                "Use a token or email + password.[/red]"
             )
             raise typer.Exit(code=1)
         config_manager = ConfigManager(CONFIG_FILE)
@@ -175,11 +181,12 @@ def init(
     asyncio.run(_init_async())
 
 
-def _read_urls_from_stdin() -> List[str]:
+def _read_urls_from_stdin() -> list[str]:
     """Reads URLs from stdin, one per line."""
     if sys.stdin.isatty():
         console.print(
-            "[yellow]⚠️  No input detected on stdin. Please pipe URLs or redirect a file.[/yellow]"
+            "[yellow]⚠️  No input detected on stdin. Please pipe URLs or redirect"
+            " a file.[/yellow]"
         )
         console.print(
             "[dim]Examples:[/dim]\n"
@@ -198,7 +205,7 @@ def _read_urls_from_stdin() -> List[str]:
                 urls.append(line)
     except KeyboardInterrupt:
         console.print("\n[yellow]⚠️  Input interrupted.[/yellow]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
     if not urls:
         console.print("[yellow]⚠️  No valid URLs found in stdin.[/yellow]")
@@ -210,43 +217,43 @@ def _read_urls_from_stdin() -> List[str]:
 
 @app.command(name="download")
 def download_command(
-    urls: Optional[List[str]] = typer.Argument(
+    urls: list[str] | None = typer.Argument(  # noqa: B008
         None, help="One or more Qobuz URLs or paths to files containing URLs."
     ),
     stdin: bool = typer.Option(
         False, "--stdin", help="Read URLs from stdin (one per line)."
     ),
-    quality: Optional[int] = typer.Option(
+    quality: int | None = typer.Option(
         None, "-q", "--quality", help="Override quality (5, 6, 7, 27)."
     ),
-    output_template: Optional[str] = typer.Option(
+    output_template: str | None = typer.Option(
         None, "-o", "--output", help="Override output path template."
     ),
-    workers: Optional[int] = typer.Option(
+    workers: int | None = typer.Option(
         None, "-w", "--workers", help="Override concurrent download limit."
     ),
-    embed_art: Optional[bool] = typer.Option(
+    embed_art: bool | None = typer.Option(
         None, "--embed-art/--no-embed-art", help="Override embed art setting."
     ),
-    no_cover: Optional[bool] = typer.Option(
+    no_cover: bool | None = typer.Option(
         None, "--no-cover/--cover", help="Override cover art download setting."
     ),
-    og_cover: Optional[bool] = typer.Option(
+    og_cover: bool | None = typer.Option(
         None, "--og-cover/--no-og-cover", help="Override original quality cover art."
     ),
-    albums_only: Optional[bool] = typer.Option(
+    albums_only: bool | None = typer.Option(
         None, "--albums-only/--all-releases", help="Override albums-only filter."
     ),
-    no_m3u: Optional[bool] = typer.Option(
+    no_m3u: bool | None = typer.Option(
         None, "--no-m3u/--m3u", help="Override M3U playlist generation."
     ),
-    no_fallback: Optional[bool] = typer.Option(
+    no_fallback: bool | None = typer.Option(
         None, "--no-fallback/--fallback", help="Override quality fallback setting."
     ),
-    smart_discography: Optional[bool] = typer.Option(
+    smart_discography: bool | None = typer.Option(
         None, "-s", "--smart/--no-smart", help="Override smart discography filter."
     ),
-    download_archive: Optional[bool] = typer.Option(
+    download_archive: bool | None = typer.Option(
         None, "--archive/--no-archive", help="Override download archive setting."
     ),
     dry_run: bool = typer.Option(
@@ -254,15 +261,17 @@ def download_command(
     ),
 ):
     """📥 Download music from Qobuz."""
-    if stdin:
-        if urls:
-            console.print(
-                "[yellow]⚠️  Both URLs and --stdin provided. Using --stdin only.[/yellow]"
-            )
+    if stdin and urls:
+        console.print(
+            "[yellow]⚠️  Both URLs and --stdin provided. Using --stdin only.[/yellow]"
+        )
+        urls = _read_urls_from_stdin()
+    elif stdin:
         urls = _read_urls_from_stdin()
     elif not urls:
         console.print(
-            "[red]✗ No URLs provided.[/red] Use: [cyan]qcli download <URL>[/cyan] or [cyan]--stdin[/cyan]"
+            "[red]✗ No URLs provided.[/red] "
+            "Use: [cyan]qcli download <URL>[/cyan] or [cyan]--stdin[/cyan]"
         )
         raise typer.Exit(code=1)
 
@@ -338,11 +347,11 @@ def download_command(
 
             except QobuzCliError as e:
                 console.print(f"[bold red]Error: {e}[/bold red]")
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
             except Exception as e:
                 console.print(f"[bold red]Unexpected error: {e}[/bold red]")
                 log.debug("Full traceback:", exc_info=True)
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
             finally:
                 await close_connection_pool()
                 if api_client:
@@ -365,7 +374,7 @@ def validate():
         formatters.print_validation_table(config)
     except QobuzCliError as e:
         console.print(f"[red]✗ Configuration is invalid: {e}[/red]")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -410,7 +419,7 @@ def doctor():
         console.print(f"[green]✓[/] Config file exists at: [dim]{CONFIG_FILE}[/dim]")
     else:
         console.print(
-            f"[red]✗ Config file not found.[/] Run [cyan]qobuz-cli init[/cyan]."
+            "[red]✗ Config file not found.[/] Run [cyan]qobuz-cli init[/cyan]."
         )
         raise typer.Exit(code=1)
     try:
@@ -431,18 +440,18 @@ def doctor():
         import aiohttp
 
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as session:
-                async with session.get("https://play.qobuz.com") as resp:
-                    if resp.status == 200:
-                        console.print("[green]✓[/] Successfully connected to Qobuz.")
-                        return True
-                    else:
-                        console.print(
-                            f"[red]✗ Could not connect to Qobuz (Status: {resp.status}).[/red]"
-                        )
-                        return False
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with (
+                aiohttp.ClientSession(timeout=timeout) as session,
+                session.get("https://play.qobuz.com") as resp,
+            ):
+                if resp.status == 200:
+                    console.print("[green]✓[/] Successfully connected to Qobuz.")
+                    return True
+                console.print(
+                    f"[red]✗ Could not connect to Qobuz (Status: {resp.status}).[/red]"
+                )
+                return False
         except Exception as e:
             console.print(f"[red]✗ Connection test failed: {e}[/red]")
             return False
@@ -456,5 +465,6 @@ def doctor():
         )
     else:
         console.print(
-            "[bold red]✗ Some issues were found. Please review the messages above.[/bold red]\n"
+            "[bold red]✗ Some issues were found. "
+            "Please review the messages above.[/bold red]\n"
         )

@@ -5,7 +5,6 @@ Pydantic model for tracking download session statistics.
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import List, Set
 
 
 @dataclass
@@ -19,13 +18,13 @@ class DownloadStats:
     tracks_failed: int = 0
     total_size_downloaded: int = 0
     dry_run: bool = False
-    albums_processed: Set[str] = field(default_factory=set)
-    albums_skipped: int = 0  # NEW: Track albums that couldn't be downloaded
+    albums_processed: set[str] = field(default_factory=set)
+    albums_skipped: int = 0
 
     # Real-time speed calculation fields
     current_speed_bps: float = 0.0
     peak_speed_bps: float = 0.0
-    _speed_samples: List[float] = field(default_factory=list, repr=False)
+    _speed_samples: list[float] = field(default_factory=list, repr=False)
     _last_progress_time: float = field(default=0.0, repr=False)
     _last_progress_bytes: int = field(default=0, repr=False)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)

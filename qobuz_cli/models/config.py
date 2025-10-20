@@ -3,11 +3,8 @@ Pydantic model for application configuration.
 Provides robust validation for all settings.
 """
 
-from typing import Dict, List, Set
-
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# Centralized quality mapping for consistency across the application
 QUALITY_MAP = {
     5: {
         "name": "MP3 320kbps",
@@ -36,7 +33,7 @@ QUALITY_MAP = {
 }
 
 
-def get_quality_info(quality_id: int) -> Dict[str, str]:
+def get_quality_info(quality_id: int) -> dict[str, str]:
     """Gets all information for a given quality ID from the central map."""
     return QUALITY_MAP.get(
         quality_id,
@@ -57,7 +54,7 @@ class DownloadConfig(BaseModel):
     password: str = ""  # This will be the MD5 hash
     token: str = ""
     app_id: str = ""
-    secrets: List[str] = Field(default_factory=list)
+    secrets: list[str] = Field(default_factory=list)
 
     # Download Settings
     quality: int = 6
@@ -79,7 +76,7 @@ class DownloadConfig(BaseModel):
 
     # Internal fields not loaded from INI file
     config_path: str = Field(..., repr=False)
-    source_urls: List[str] = Field(default_factory=list, repr=False)
+    source_urls: list[str] = Field(default_factory=list, repr=False)
 
     class Config:
         """Pydantic model configuration."""
@@ -93,7 +90,8 @@ class DownloadConfig(BaseModel):
         """Ensures quality is a valid Qobuz format ID."""
         if v not in QUALITY_MAP:
             raise ValueError(
-                f"Quality must be one of {list(QUALITY_MAP.keys())} ({', '.join(q['name'] for q in QUALITY_MAP.values())})"
+                f"Quality must be one of {list(QUALITY_MAP.keys())} "
+                f"({', '.join(q['name'] for q in QUALITY_MAP.values())})"
             )
         return v
 
@@ -134,7 +132,8 @@ class DownloadConfig(BaseModel):
 
         if not has_token and not has_email_pass:
             raise ValueError(
-                "Authentication not configured. Provide either a token or email/password."
+                "Authentication not configured. Provide either a token or "
+                "email/password."
             )
 
         if not self.app_id or not self.app_id.strip() or not self.secrets:
@@ -157,7 +156,7 @@ class DownloadConfig(BaseModel):
         return self
 
     @classmethod
-    def get_ini_keys(cls) -> Set[str]:
+    def get_ini_keys(cls) -> set[str]:
         """Returns a set of all keys that are expected in the INI file."""
         internal_fields = {"config_path", "source_urls"}
         return {key for key in cls.model_fields if key not in internal_fields}

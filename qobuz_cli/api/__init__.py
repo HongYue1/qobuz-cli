@@ -8,4 +8,4 @@ from .auth import QobuzAuthenticator
 from .client import QobuzAPIClient
 from .rate_limiter import AdaptiveRateLimiter
 
-__all__ = ["QobuzAPIClient", "QobuzAuthenticator", "AdaptiveRateLimiter"]
+__all__ = ["AdaptiveRateLimiter", "QobuzAPIClient", "QobuzAuthenticator"]

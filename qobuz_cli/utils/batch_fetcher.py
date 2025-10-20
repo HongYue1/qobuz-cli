@@ -5,7 +5,7 @@ Fetches multiple albums/tracks in parallel with proper error handling.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class BatchMetadataFetcher:
         self.semaphore = asyncio.Semaphore(max_concurrent)
 
     async def fetch_albums_batch(
-        self, album_ids: List[str]
-    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        self, album_ids: list[str]
+    ) -> dict[str, dict[str, Any] | None]:
         """
         Fetches multiple album metadata objects in parallel.
 
@@ -41,7 +41,7 @@ class BatchMetadataFetcher:
 
         log.debug(f"Batch fetching metadata for {len(album_ids)} albums...")
 
-        async def fetch_single(album_id: str) -> tuple[str, Optional[Dict[str, Any]]]:
+        async def fetch_single(album_id: str) -> tuple[str, dict[str, Any] | None]:
             async with self.semaphore:
                 try:
                     metadata = await self.api_client.fetch_album_metadata(album_id)
@@ -53,11 +53,11 @@ class BatchMetadataFetcher:
         tasks = [fetch_single(aid) for aid in album_ids]
         results = await asyncio.gather(*tasks)
 
-        return {album_id: metadata for album_id, metadata in results}
+        return dict(results)
 
     async def fetch_tracks_batch(
-        self, track_ids: List[str]
-    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        self, track_ids: list[str]
+    ) -> dict[str, dict[str, Any] | None]:
         """
         Fetches multiple track metadata objects in parallel.
 
@@ -72,7 +72,7 @@ class BatchMetadataFetcher:
 
         log.debug(f"Batch fetching metadata for {len(track_ids)} tracks...")
 
-        async def fetch_single(track_id: str) -> tuple[str, Optional[Dict[str, Any]]]:
+        async def fetch_single(track_id: str) -> tuple[str, dict[str, Any] | None]:
             async with self.semaphore:
                 try:
                     metadata = await self.api_client.fetch_track_metadata(track_id)
@@ -84,11 +84,11 @@ class BatchMetadataFetcher:
         tasks = [fetch_single(tid) for tid in track_ids]
         results = await asyncio.gather(*tasks)
 
-        return {track_id: metadata for track_id, metadata in results}
+        return dict(results)
 
     async def prefetch_album_tracks(
-        self, album_ids: List[str]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, album_ids: list[str]
+    ) -> dict[str, dict[str, Any]]:
         """
         Pre-fetches all album metadata and their track lists.
 

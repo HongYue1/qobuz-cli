@@ -1,13 +1,13 @@
 """
 Manages a Rich Live display with enhanced visualization for concurrent downloads.
-Shows overall progress, active downloads, MULTIPLE CONCURRENT ALBUMS, and real-time statistics.
+Shows overall progress, active downloads, MULTIPLE CONCURRENT ALBUMS, and real-time
+statistics.
 """
 
 import asyncio
 import logging
-import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.layout import Layout
@@ -61,8 +61,8 @@ class ProgressManager:
             console=console,
         )
 
-        self._live: Optional[Live] = None
-        self._layout: Optional[Layout] = None
+        self._live: Live | None = None
+        self._layout: Layout | None = None
 
         self._stats = {
             "total_tracks": 0,
@@ -81,9 +81,9 @@ class ProgressManager:
             "cache_misses": 0,
         }
 
-        self._current_albums: Dict[str, Dict[str, Any]] = {}
-        self._overall_task_id: Optional[TaskID] = None
-        self._active_tasks: Dict[TaskID, Dict] = {}
+        self._current_albums: dict[str, dict[str, Any]] = {}
+        self._overall_task_id: TaskID | None = None
+        self._active_tasks: dict[TaskID, dict] = {}
 
     def log_message(self, message: str, level: str = "info"):
         """Unified logging respecting dry_run mode."""
@@ -100,7 +100,7 @@ class ProgressManager:
             getattr(log, level, log.info)(message)
 
     def set_current_album(
-        self, artist: str, title: str, total_tracks: int, album_id: str = None
+        self, artist: str, title: str, total_tracks: int, album_id: str | None = None
     ):
         album_key = album_id or f"{artist}_{title}"
         self._current_albums[album_key] = {
@@ -112,7 +112,7 @@ class ProgressManager:
         if len(self._current_albums) > 5:
             self._current_albums.pop(next(iter(self._current_albums)))
 
-    def increment_album_progress(self, album_id: Optional[str] = None, count: int = 1):
+    def increment_album_progress(self, album_id: str | None = None, count: int = 1):
         album_key = album_id
         if album_key and album_key in self._current_albums:
             self._current_albums[album_key]["completed"] += count
@@ -120,7 +120,7 @@ class ProgressManager:
             last_key = next(reversed(self._current_albums))
             self._current_albums[last_key]["completed"] += count
 
-    def clear_current_album(self, album_id: str = None):
+    def clear_current_album(self, album_id: str | None = None):
         if album_id and album_id in self._current_albums:
             del self._current_albums[album_id]
         elif self._current_albums:
@@ -152,7 +152,8 @@ class ProgressManager:
     def _generate_header(self) -> Panel:
         if self._stats["start_time"]:
             elapsed = (datetime.now() - self._stats["start_time"]).total_seconds()
-            elapsed_str = f"{int(elapsed // 3600):02d}:{int((elapsed % 3600) // 60):02d}:{int(elapsed % 60):02d}"
+            elapsed_str = f"{int(elapsed // 3600):02d}:"
+            f"{int((elapsed % 3600) // 60):02d}:{int(elapsed % 60):02d}"
         else:
             elapsed_str = "00:00:00"
         header_text = Text()
@@ -299,7 +300,9 @@ class ProgressManager:
         )
 
     def _update_display(self):
-        """Updates all panels in the layout, letting the Live object handle refresh rate."""
+        """
+        Updates all panels in the layout, letting the Live object handle refresh rate.
+        """
         if self.dry_run or not self._layout:
             return
 
@@ -308,7 +311,7 @@ class ProgressManager:
         self._layout["album_context"].update(self._generate_album_context_panel())
         self._layout["progress"].update(self._generate_progress_panel())
 
-    def initialize_session(self, total_tracks: Optional[int]):
+    def initialize_session(self, total_tracks: int | None):
         self._stats["total_tracks"] = total_tracks or 0
         self._stats["start_time"] = datetime.now()
         if not self.dry_run:

@@ -47,7 +47,8 @@ class AdaptiveRateLimiter:
 
     async def acquire(self) -> None:
         """
-        Waits if necessary to respect the current rate limit before allowing a call to proceed.
+        Waits if necessary to respect the current rate limit before allowing a call
+        to proceed.
         """
         async with self._lock:
             # Gradually recover the rate if no 429 errors have occurred recently

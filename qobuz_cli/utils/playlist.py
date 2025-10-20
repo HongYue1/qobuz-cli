@@ -51,6 +51,6 @@ def generate_m3u(playlist_directory: Path) -> bool:
             f.write("\n".join(content))
         log.info(f"Generated playlist: '{playlist_path}'")
         return True
-    except IOError as e:
+    except OSError as e:
         log.error(f"Failed to write playlist file: {e}")
         return False

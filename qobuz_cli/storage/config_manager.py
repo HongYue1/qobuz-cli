@@ -5,7 +5,7 @@ Manages loading, validation, and migration of the INI configuration file.
 import configparser
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -27,9 +27,7 @@ class ConfigManager:
         self.config_file_path = config_file_path
         self._parser = configparser.ConfigParser()
 
-    def load_config(
-        self, cli_options: Optional[Dict[str, Any]] = None
-    ) -> DownloadConfig:
+    def load_config(self, cli_options: dict[str, Any] | None = None) -> DownloadConfig:
         """
         Loads configuration from the INI file, applies CLI overrides, and validates it.
 
@@ -40,7 +38,8 @@ class ConfigManager:
             A validated DownloadConfig object.
 
         Raises:
-            ConfigurationError: If the config file is missing, invalid, or validation fails.
+            ConfigurationError: If the config file is missing, invalid, or validation
+            fails.
         """
         if not self.config_file_path.is_file():
             raise ConfigurationError(
@@ -55,7 +54,8 @@ class ConfigManager:
 
         if self._migrate_if_needed():
             log.info(
-                "[yellow]Configuration file was updated with new default values.[/yellow]"
+                "[yellow]Configuration file was updated with new default values."
+                "[/yellow]"
             )
 
         config_from_file = self._get_config_as_dict()
@@ -70,7 +70,7 @@ class ConfigManager:
         except ValidationError as e:
             raise ConfigurationError(f"Configuration validation failed:\n{e}") from e
 
-    def save_new_config(self, settings: Dict[str, Any]) -> None:
+    def save_new_config(self, settings: dict[str, Any]) -> None:
         """
         Creates and saves a new configuration file.
 
@@ -104,10 +104,10 @@ class ConfigManager:
             self.config_file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_file_path, "w", encoding="utf-8") as configfile:
                 config.write(configfile)
-        except IOError as e:
+        except OSError as e:
             raise ConfigurationError(f"Failed to save configuration file: {e}") from e
 
-    def _get_config_as_dict(self) -> Dict[str, Any]:
+    def _get_config_as_dict(self) -> dict[str, Any]:
         """Reads the 'DEFAULT' section of the INI file into a dictionary."""
         section = self._parser["DEFAULT"]
         return {
@@ -156,14 +156,15 @@ class ConfigManager:
 
                 needs_saving = True
                 log.debug(
-                    f"Migrating config: added missing key '{key}' with value '{config_section[key]}'."
+                    f"Migrating config: added missing key '{key}' with "
+                    f"value '{config_section[key]}'."
                 )
 
         if needs_saving:
             try:
                 with open(self.config_file_path, "w", encoding="utf-8") as f:
                     self._parser.write(f)
-            except IOError as e:
+            except OSError as e:
                 log.error(f"Could not save migrated configuration file: {e}")
                 return False
 

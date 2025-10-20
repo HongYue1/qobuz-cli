@@ -1,6 +1,7 @@
 """
-Core Business Logic Layer.
+Core application engine for orchestrating the download process.
 
-This package contains the main orchestrator (DownloadManager) and the
-logic for processing individual tracks (TrackProcessor).
+This package contains the primary logic. The `DownloadManager` acts
+as the high-level session coordinator, delegating the task of processing
+each individual file to the `TrackProcessor`.
 """

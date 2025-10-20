@@ -3,7 +3,7 @@ Functions for formatting and displaying data in the console using Rich.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from rich import box
 from rich.console import Console
@@ -11,12 +11,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from qobuz_cli.models.config import DownloadConfig, QUALITY_MAP
+from qobuz_cli.models.config import QUALITY_MAP, DownloadConfig
 from qobuz_cli.models.stats import DownloadStats
 from qobuz_cli.utils.formatting import format_duration, format_size
 
 
-def format_error_with_suggestions(error: Exception, context: Dict = None) -> Panel:
+def format_error_with_suggestions(
+    error: Exception, context: dict | None = None
+) -> Panel:
     """Formats an error with actionable suggestions into a Rich Panel."""
     error_type = type(error).__name__
     error_msg = str(error)
@@ -81,7 +83,7 @@ def format_error_with_suggestions(error: Exception, context: Dict = None) -> Pan
     )
 
 
-def print_config(config_path: Path, config_data: Dict[str, Any]):
+def print_config(config_path: Path, config_data: dict[str, Any]):
     """Displays the current configuration, hiding sensitive data."""
     console = Console()
     content = ""
@@ -130,11 +132,12 @@ def print_validation_table(config: DownloadConfig):
     )
 
 
-def print_stats_table(stats_data: Dict[str, Any]):
+def print_stats_table(stats_data: dict[str, Any]):
     """Displays download archive statistics."""
     console = Console()
     console.print(
-        f"\n[bold]Total Tracks in Archive:[/] [green]{stats_data['total_tracks']}[/green]\n"
+        "\n[bold]Total Tracks in Archive:[/] "
+        f"[green]{stats_data['total_tracks']}[/green]\n"
     )
 
     if top_artists := stats_data.get("top_artists"):
@@ -150,7 +153,7 @@ def print_stats_table(stats_data: Dict[str, Any]):
 
 
 def print_summary_panel(
-    stats: DownloadStats, duration_s: float, progress_stats: Optional[Dict] = None
+    stats: DownloadStats, duration_s: float, progress_stats: dict | None = None
 ):
     """Displays an enhanced final summary of the download session."""
     console = Console()
