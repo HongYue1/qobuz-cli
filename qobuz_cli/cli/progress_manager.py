@@ -143,7 +143,7 @@ class ProgressManager:
         layout = Layout()
         layout.split_column(
             Layout(name="header", size=3),
-            Layout(name="stats", size=9),
+            Layout(name="stats", size=7),  # Reduced size
             Layout(name="album_context", size=8),
             Layout(name="progress", ratio=1),
         )
@@ -152,8 +152,9 @@ class ProgressManager:
     def _generate_header(self) -> Panel:
         if self._stats["start_time"]:
             elapsed = (datetime.now() - self._stats["start_time"]).total_seconds()
-            elapsed_str = f"{int(elapsed // 3600):02d}:"
-            f"{int((elapsed % 3600) // 60):02d}:{int(elapsed % 60):02d}"
+            hours, remainder = divmod(int(elapsed), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         else:
             elapsed_str = "00:00:00"
         header_text = Text()
@@ -172,12 +173,16 @@ class ProgressManager:
         stats_table.add_column(style="white")
         stats_table.add_column(style="bold cyan", justify="right")
         stats_table.add_column(style="white")
+
+        # Row 1: Downloaded, Failed
         stats_table.add_row(
             "Downloaded:",
             f"[green]{self._stats['completed']}[/green]",
             "Failed:",
             f"[red]{self._stats['failed']}[/red]",
         )
+
+        # Row 2: Skipped, Remaining
         skipped_val = (
             self._stats["total_tracks"]
             - self._stats["completed"]
@@ -190,30 +195,19 @@ class ProgressManager:
             "Remaining:",
             f"[cyan]{skipped_val}[/cyan]",
         )
-        stats_table.add_row(
-            "Active:",
-            f"[cyan]{self._stats['active_downloads']}[/cyan]",
-            "Peak:",
-            f"[magenta]{self._stats['peak_concurrent']}[/magenta]",
-        )
-        if self._stats["avg_speed"] > 0:
-            avg_speed_mb = self._stats["avg_speed"] / (1024 * 1024)
-            peak_speed_mb = self._stats["peak_speed"] / (1024 * 1024)
-            stats_table.add_row(
-                "Avg Speed:",
-                f"[blue]{avg_speed_mb:.1f} MB/s[/blue]",
-                "Peak Speed:",
-                f"[magenta]{peak_speed_mb:.1f} MB/s[/magenta]",
-            )
-        total_cache = self._stats["cache_hits"] + self._stats["cache_misses"]
-        if total_cache > 0:
-            cache_rate = (self._stats["cache_hits"] / total_cache) * 100
-            stats_table.add_row(
-                "Cache Hits:",
-                f"[green]{self._stats['cache_hits']}[/green]",
-                "Hit Rate:",
-                f"[green]{cache_rate:.0f}%[/green]",
-            )
+
+        # Only show cache stats if logging level is DEBUG (-vv)
+        if log.getEffectiveLevel() <= logging.DEBUG:
+            total_cache = self._stats["cache_hits"] + self._stats["cache_misses"]
+            if total_cache > 0:
+                cache_rate = (self._stats["cache_hits"] / total_cache) * 100
+                stats_table.add_row(
+                    "Cache Hits:",
+                    f"[green]{self._stats['cache_hits']}[/green]",
+                    "Hit Rate:",
+                    f"[green]{cache_rate:.0f}%[/green]",
+                )
+
         combined = Table.grid()
         combined.add_row(stats_table)
         combined.add_row("")
@@ -333,7 +327,7 @@ class ProgressManager:
         total_size: int,
         quality: str = "",
         file_size_str: str = "",
-    ) -> TaskID:
+    ) -> TaskID | None:
         if self.dry_run:
             return None
         if len(description) > 55:
@@ -387,7 +381,7 @@ class ProgressManager:
         if task_id is not None and not self.dry_run:
             self.progress.update(task_id, total=total)
 
-    def remove_task(self, task_id: TaskID, success: bool = True):
+    def remove_task(self, task_id: TaskID | None, success: bool = True):
         if task_id is None or self.dry_run:
             return
         try:
@@ -425,7 +419,7 @@ class ProgressManager:
             )
         self._update_display()
 
-    def get_statistics(self) -> dict:
+    def get_statistics(self) -> dict[str, Any]:
         return self._stats.copy()
 
     async def __aenter__(self):
