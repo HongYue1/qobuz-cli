@@ -24,7 +24,13 @@ from qobuz_cli.storage.archive import TrackArchive
 from qobuz_cli.storage.config_manager import ConfigManager
 from qobuz_cli.web.bundle_fetcher import BundleFetcher
 
-from . import formatters
+from .formatters import (
+    print_config,
+    print_output_template_help,
+    print_stats_table,
+    print_summary_panel,
+    print_validation_table,
+)
 from .progress_manager import ProgressManager
 
 console = Console()
@@ -47,7 +53,10 @@ log = logging.getLogger("qobuz_cli")
 
 app = typer.Typer(
     name="qobuz-cli",
-    help="A fast, modern, and concurrent music downloader from Qobuz.",
+    help=(
+        "A fast, modern, and concurrent music downloader from Qobuz. Use 'qcli"
+        " <command> --help' for more info."
+    ),
     rich_markup_mode="rich",
     pretty_exceptions_show_locals=False,
     add_completion=False,
@@ -76,15 +85,27 @@ def main_callback(
         count=True,
         help="Increase logging verbosity (-vv for debug).",
     ),
-    version: bool = typer.Option(False, "--version", help="Show version and exit."),
+    version: bool = typer.Option(
+        False, "--version", help="Show version and exit.", is_eager=True
+    ),
     show_config: bool = typer.Option(
         False, "--show-config", help="Display the current configuration."
+    ),
+    output_help: bool = typer.Option(
+        False,
+        "--output-help",
+        help="Show detailed help for formatting the output path and exit.",
+        is_eager=True,
     ),
     clear_cache: bool = typer.Option(
         False, "--clear-cache", help="Clear the metadata cache and exit."
     ),
 ):
     """Qobuz Downloader CLI"""
+    if output_help:
+        print_output_template_help()
+        raise typer.Exit()
+
     if version:
         console.print(f"[bold]qobuz-cli[/bold] version [cyan]{__version__}[/cyan]")
         raise typer.Exit()
@@ -121,7 +142,7 @@ def main_callback(
             raise typer.Exit(code=1)
         config_manager = ConfigManager(CONFIG_FILE)
         config_data = config_manager._get_config_as_dict()
-        formatters.print_config(CONFIG_FILE, config_data)
+        print_config(CONFIG_FILE, config_data)
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:
@@ -136,14 +157,16 @@ def init(
         metavar="<TOKEN> | <EMAIL> <PASSWORD>",
     ),
     force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite existing config."
+        False, "--force", "-f", help="Overwrite existing credentials without asking."
     ),
 ):
-    """🔧 Initialize configuration with Qobuz credentials."""
+    """Initialize configuration with Qobuz credentials."""
     if (
         CONFIG_FILE.exists()
         and not force
-        and not typer.confirm("Configuration file already exists. Overwrite?")
+        and not typer.confirm(
+            "Configuration file already exists. Overwrite the credentials?"
+        )
     ):
         raise typer.Abort()
 
@@ -220,47 +243,84 @@ def download_command(
     urls: list[str] | None = typer.Argument(  # noqa: B008
         None, help="One or more Qobuz URLs or paths to files containing URLs."
     ),
-    stdin: bool = typer.Option(
-        False, "--stdin", help="Read URLs from stdin (one per line)."
-    ),
+    # --- Core Download Options ---
     quality: int | None = typer.Option(
-        None, "-q", "--quality", help="Override quality (5, 6, 7, 27)."
+        None,
+        "-q",
+        "--quality",
+        help=(
+            "Set quality. 1: MP3 320, 2: CD (16/44.1), 3: Hi-Res (24/96), "
+            "4: Hi-Res+ (24/192)."
+        ),
     ),
     output_template: str | None = typer.Option(
-        None, "-o", "--output", help="Override output path template."
+        None,
+        "-o",
+        "--output",
+        help="Define the download path. Use qcli --output-help for all placeholders.",
     ),
     workers: int | None = typer.Option(
-        None, "-w", "--workers", help="Override concurrent download limit."
+        None,
+        "-w",
+        "--workers",
+        help=(
+            "Number of simultaneous downloads (default 8, override default in config)."
+        ),
     ),
+    # --- File & Artwork Options ---
     embed_art: bool | None = typer.Option(
-        None, "--embed-art/--no-embed-art", help="Override embed art setting."
+        None,
+        "--embed-art/--no-embed-art",
+        help="Save the cover art inside the audio file's metadata.",
     ),
     no_cover: bool | None = typer.Option(
-        None, "--no-cover/--cover", help="Override cover art download setting."
+        None,
+        "--no-cover/--cover",
+        help="Do not save the separate 'cover.jpg' file.",
     ),
     og_cover: bool | None = typer.Option(
-        None, "--og-cover/--no-og-cover", help="Override original quality cover art."
-    ),
-    albums_only: bool | None = typer.Option(
-        None, "--albums-only/--all-releases", help="Override albums-only filter."
+        None,
+        "--og-cover/--no-og-cover",
+        help="Download cover art in its original resolution (not 600x600).",
     ),
     no_m3u: bool | None = typer.Option(
-        None, "--no-m3u/--m3u", help="Override M3U playlist generation."
+        None,
+        "--no-m3u/--m3u",
+        help="Do not create a .m3u playlist file when downloading a playlist.",
     ),
+    # --- Content Filtering Options ---
     no_fallback: bool | None = typer.Option(
-        None, "--no-fallback/--fallback", help="Override quality fallback setting."
+        None,
+        "--no-fallback/--fallback",
+        help="Skip tracks if requested quality is unavailable (no downgrading).",
     ),
     smart_discography: bool | None = typer.Option(
-        None, "-s", "--smart/--no-smart", help="Override smart discography filter."
+        None,
+        "-s",
+        "--smart/--no-smart",
+        help="Filter discographies to remove duplicate albums (remasters, etc.).",
     ),
+    albums_only: bool | None = typer.Option(
+        None,
+        "--albums-only/--all-releases",
+        help="Download only full albums from discographies (skip singles/EPs).",
+    ),
+    # --- Behavior & Utility Options ---
     download_archive: bool | None = typer.Option(
-        None, "--archive/--no-archive", help="Override download archive setting."
+        None,
+        "--archive/--no-archive",
+        help="Keep a record of downloaded tracks to avoid re-downloading them.",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Simulate download without writing files."
+        False,
+        "--dry-run",
+        help="Simulate the download process without writing any files.",
+    ),
+    stdin: bool = typer.Option(
+        False, "--stdin", help="Read URLs from standard input, one URL per line."
     ),
 ):
-    """📥 Download music from Qobuz."""
+    """Download music from Qobuz."""
     if stdin and urls:
         console.print(
             "[yellow]⚠️  Both URLs and --stdin provided. Using --stdin only.[/yellow]"
@@ -358,7 +418,7 @@ def download_command(
                     await api_client.close()
 
         if manager:
-            formatters.print_summary_panel(manager.stats, duration, progress_stats)
+            print_summary_panel(manager.stats, duration, progress_stats)
             if not manager.config.dry_run:
                 manager.save_session_stats()
 
@@ -367,11 +427,11 @@ def download_command(
 
 @app.command()
 def validate():
-    """✓ Validate the current configuration."""
+    """Validate the current configuration."""
     try:
         config_manager = ConfigManager(CONFIG_FILE)
         config = config_manager.load_config()
-        formatters.print_validation_table(config)
+        print_validation_table(config)
     except QobuzCliError as e:
         console.print(f"[red]✗ Configuration is invalid: {e}[/red]")
         raise typer.Exit(code=1) from e
@@ -379,14 +439,14 @@ def validate():
 
 @app.command()
 def stats():
-    """📊 Show statistics from the download archive."""
+    """Show statistics from the download archive."""
 
     async def _get_stats():
         try:
             archive = TrackArchive(CONFIG_DIR)
             stats_data = await archive.get_stats()
             if stats_data:
-                formatters.print_stats_table(stats_data)
+                print_stats_table(stats_data)
             else:
                 console.print("[yellow]Could not retrieve stats.[/yellow]")
         except Exception as e:
@@ -397,7 +457,7 @@ def stats():
 
 @app.command()
 def vacuum():
-    """🧹 Optimize the download archive database."""
+    """Optimize the download archive database."""
 
     async def _vacuum():
         console.print("[cyan]Optimizing archive database...[/cyan]")
@@ -410,10 +470,38 @@ def vacuum():
     asyncio.run(_vacuum())
 
 
+@app.command(name="clear-archive")
+def clear_archive(
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Bypass the confirmation prompt.",
+    ),
+):
+    """Clear the entire download archive database."""
+    if not force and not typer.confirm(
+        "Are you sure you want to clear the entire download archive? "
+        "This action will erase your download history and cannot be undone."
+    ):
+        console.print("[yellow]Operation cancelled.[/yellow]")
+        raise typer.Abort()
+
+    async def _clear_archive_async():
+        console.print("[cyan]Clearing download archive...[/cyan]")
+        archive = TrackArchive(CONFIG_DIR)
+        if await archive.clear():
+            console.print("[green]✓ Download archive cleared successfully.[/green]")
+        else:
+            console.print("[red]✗ Failed to clear download archive.[/red]")
+
+    asyncio.run(_clear_archive_async())
+
+
 @app.command()
-def doctor():
-    """🩺 Diagnose common configuration and connectivity issues."""
-    console.print("\n[bold cyan]🩺 Running diagnostics...[/bold cyan]\n")
+def diagnose():
+    """Diagnose common configuration and connectivity issues."""
+    console.print("\n[bold cyan]Running diagnostics...[/bold cyan]\n")
     issues_found = False
     if CONFIG_FILE.is_file():
         console.print(f"[green]✓[/] Config file exists at: [dim]{CONFIG_FILE}[/dim]")

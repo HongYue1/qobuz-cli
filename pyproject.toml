@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "qobuz-cli"
 version = "v0.0.1"
-authors = [{ name = "HongYue1", email = "redacted@redacted.com" }]
+authors = [{ name = "HongYue1", email = "moonlord369@gmail.com" }]
 description = " Blazing fast Qobuz CLI downloader with modern UI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -61,7 +61,7 @@ select = [
     "UP",    # pyupgrade
     "B",     # flake8-bugbear
     "C4",    # flake8-comprehensions
-    "SIM",   # flake8-simplify 
+    "SIM",   # flake8-simplify
     "PIE",   # flake8-pie
     "RUF",   # Ruff-specific rules
     "ASYNC", # flake8-async

@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from qobuz_cli.exceptions import ConfigurationError
-from qobuz_cli.models.config import DownloadConfig
+from qobuz_cli.models.config import QUALITY_MAP, DownloadConfig
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +18,11 @@ DEFAULT_OUTPUT_TEMPLATE = (
     "{albumartist}/{album} ({year})/"
     "%{?is_multidisc,Disc {media_number}/|}{tracknumber}. {tracktitle}.{ext}"
 )
+
+# Reverse map to convert internal API codes back to user-friendly codes for saving
+API_TO_USER_QUALITY = {
+    v: k for k, v in QUALITY_MAP.items() if isinstance(k, int) and k <= 4
+}
 
 
 class ConfigManager:
@@ -82,7 +87,8 @@ class ConfigManager:
 
         # Get all possible keys from the model to create a complete default config
         defaults = DownloadConfig.model_construct(
-            output_template=DEFAULT_OUTPUT_TEMPLATE
+            output_template=DEFAULT_OUTPUT_TEMPLATE,
+            quality=6,
         )
         all_keys = DownloadConfig.get_ini_keys()
 
@@ -90,7 +96,11 @@ class ConfigManager:
             # Use provided settings first, then fall back to model defaults
             value = settings.get(key, getattr(defaults, key, None))
 
-            if isinstance(value, bool):
+            if key == "quality":
+                # Translate internal API code back to user code for saving
+                user_code = API_TO_USER_QUALITY.get(value, 2)
+                config["DEFAULT"][key] = str(user_code)
+            elif isinstance(value, bool):
                 config["DEFAULT"][key] = "true" if value else "false"
             elif isinstance(value, list):
                 config["DEFAULT"][key] = ",".join(map(str, value))
@@ -118,7 +128,7 @@ class ConfigManager:
             "secrets": [
                 s.strip() for s in section.get("secrets", "").split(",") if s.strip()
             ],
-            "quality": section.getint("quality", 6),
+            "quality": section.getint("quality", 2),
             "max_workers": section.getint("max_workers", 8),
             "output_template": section.get("output_template", DEFAULT_OUTPUT_TEMPLATE),
             "embed_art": section.getboolean("embed_art", False),
@@ -134,7 +144,8 @@ class ConfigManager:
     def _migrate_if_needed(self) -> bool:
         """Adds missing default values to an existing config file."""
         defaults = DownloadConfig.model_construct(
-            output_template=DEFAULT_OUTPUT_TEMPLATE
+            output_template=DEFAULT_OUTPUT_TEMPLATE,
+            quality=6,  # Internal API code
         )
         default_keys = DownloadConfig.get_ini_keys()
         needs_saving = False
@@ -145,7 +156,11 @@ class ConfigManager:
             if key not in config_section:
                 default_value = getattr(defaults, key)
 
-                if isinstance(default_value, bool):
+                if key == "quality":
+                    # Add missing quality with user-friendly code
+                    user_code = API_TO_USER_QUALITY.get(default_value, 2)
+                    config_section[key] = str(user_code)
+                elif isinstance(default_value, bool):
                     config_section[key] = "false"
                 elif isinstance(default_value, list):
                     config_section[key] = ",".join(map(str, default_value))

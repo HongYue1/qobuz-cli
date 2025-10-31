@@ -5,30 +5,41 @@ Provides robust validation for all settings.
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+# Maps user-friendly codes to API codes and provides metadata
 QUALITY_MAP = {
+    # User code -> API code
+    1: 5,
+    2: 6,
+    3: 7,
+    4: 27,
+    # API code -> Metadata (for internal use)
     5: {
         "name": "MP3 320kbps",
         "short": "MP3 320",
         "ext": "mp3",
         "color": "yellow",
+        "user_code": 1,
     },
     6: {
         "name": "CD Lossless (16/44.1)",
         "short": "16/44.1",
         "ext": "flac",
         "color": "green",
+        "user_code": 2,
     },
     7: {
         "name": "Hi-Res (up to 24/96)",
         "short": "24/96",
         "ext": "flac",
         "color": "cyan",
+        "user_code": 3,
     },
     27: {
         "name": "Hi-Res+ (up to 24/192)",
         "short": "24/192",
         "ext": "flac",
         "color": "magenta",
+        "user_code": 4,
     },
 }
 
@@ -42,6 +53,7 @@ def get_quality_info(quality_id: int) -> dict[str, str]:
             "short": "Unknown",
             "ext": "flac",
             "color": "white",
+            "user_code": 0,
         },
     )
 
@@ -87,11 +99,18 @@ class DownloadConfig(BaseModel):
     @field_validator("quality")
     @classmethod
     def validate_quality(cls, v: int) -> int:
-        """Ensures quality is a valid Qobuz format ID."""
-        if v not in QUALITY_MAP:
+        """
+        Ensures quality is a valid user code (1-4) or API code and translates it
+        to the internal API code.
+        """
+        # If it's a user code (1-4), map it to the API code
+        if v in (1, 2, 3, 4):
+            return QUALITY_MAP[v]
+
+        # If it's a direct API code, ensure it's valid
+        if v not in (5, 6, 7, 27):
             raise ValueError(
-                f"Quality must be one of {list(QUALITY_MAP.keys())} "
-                f"({', '.join(q['name'] for q in QUALITY_MAP.values())})"
+                "Quality must be one of 1 (MP3), 2 (CD), 3 (Hi-Res), 4 (Hi-Res+)."
             )
         return v
 

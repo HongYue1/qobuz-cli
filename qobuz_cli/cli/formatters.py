@@ -111,9 +111,12 @@ def print_validation_table(config: DownloadConfig):
     table.add_column()
 
     auth_method = "Token" if config.token else "Email/Password"
-    quality_name = QUALITY_MAP.get(config.quality, {}).get("name", "Unknown")
+    quality_info = QUALITY_MAP.get(config.quality, {})
+    quality_name = quality_info.get("name", "Unknown")
+    user_code = quality_info.get("user_code", "?")
+
     table.add_row("Auth Method:", f"[green]{auth_method}[/green]")
-    table.add_row("Quality:", quality_name)
+    table.add_row("Quality:", f"({user_code}) {quality_name}")
     table.add_row("Max Workers:", str(config.max_workers))
     table.add_row(
         "Download Archive:", "✓ Enabled" if config.download_archive else "✗ Disabled"
@@ -250,3 +253,153 @@ def print_summary_panel(
     )
 
     console.print()
+
+
+def print_output_template_help():
+    """Displays a detailed help panel for output path templates."""
+    console = Console()
+
+    # --- Main Panel ---
+    main_panel = Panel(
+        Text(
+            "Construct file paths using placeholders. All placeholder outputs are"
+            " automatically sanitized to be safe for filenames.",
+            justify="center",
+        ),
+        title="[bold]Output Path Template Guide[/bold]",
+        border_style="cyan",
+        padding=(1, 2),
+    )
+
+    # --- Placeholders Table ---
+    ph_table = Table(
+        box=box.ROUNDED,
+        title="[bold]Complete Placeholder Reference[/bold]",
+        title_style="",
+    )
+    ph_table.add_column("Placeholder", style="bold magenta", no_wrap=True)
+    ph_table.add_column("Description")
+    ph_table.add_column("Example")
+
+    # Track Placeholders
+    ph_table.add_section()
+    ph_table.add_row("[bold]-- Track --[/bold]")
+    ph_table.add_row("{tracknumber}", "Track number, zero-padded.", "'01'")
+    ph_table.add_row(
+        "{tracktitle}",
+        "Title of the track, including version (e.g., 'Remastered').",
+        "'The Song (Live)'",
+    )
+    ph_table.add_row(
+        "{artist}",
+        "Comma-separated list of all artists on the track.",
+        "'Artist A, Artist B'",
+    )
+    ph_table.add_row(
+        "{artist_featuring}",
+        "Main artist with featured artists in parentheses.",
+        "'Artist A (feat. B)'",
+    )
+    ph_table.add_row("{composer}", "Comma-separated list of composers.", "'J.S. Bach'")
+    ph_table.add_row("{producer}", "Comma-separated list of producers.", "'Max Martin'")
+
+    # Album Placeholders
+    ph_table.add_section()
+    ph_table.add_row("[bold]-- Album --[/bold]")
+    ph_table.add_row("{album}", "Title of the album.", "'The Album'")
+    ph_table.add_row(
+        "{albumartist}", "The primary artist credited for the album.", "'The Main Band'"
+    )
+    ph_table.add_row("{year}", "The album's original 4-digit release year.", "'1999'")
+    ph_table.add_row(
+        "{media_number}", "The disc number (for multi-disc albums).", "'1'"
+    )
+
+    # File Placeholders
+    ph_table.add_section()
+    ph_table.add_row("[bold]-- File --[/bold]")
+    ph_table.add_row(
+        "{ext}", "The file extension based on selected quality.", "'flac' or 'mp3'"
+    )
+
+    # --- Conditional Logic Panel ---
+    cond_grid = Table.grid(expand=True, padding=(0, 1))
+    cond_grid.add_row(
+        "[bold cyan]Syntax:[/bold cyan]",
+        "`%{?key,value_if_true|value_if_false}`",
+    )
+    cond_grid.add_row(
+        "[bold cyan]How it works:[/bold cyan]",
+        "If the placeholder `key` exists and is not empty, the `value_if_true` is"
+        " inserted. Otherwise, `value_if_false` is used. You can use other placeholders"
+        " inside these values.",
+    )
+    cond_grid.add_row()
+    cond_grid.add_row("[bold]Provided Conditionals:[/bold]")
+    cond_grid.add_row(
+        "`is_multidisc`",
+        "A special key that is '1' if the album has more than one disc, "
+        "and '0' otherwise.",
+    )
+    cond_grid.add_row()
+    cond_grid.add_row("[bold]Examples:[/bold]")
+    cond_grid.add_row(
+        "• Simple Disc Folder:",
+        "`{albumartist}/{album}/%{?is_multidisc,Disc {media_number}/|}`",
+    )
+    cond_grid.add_row(
+        "  ↳ Result for multi-disc:",
+        "`Artist/Album/Disc 1/`",
+        style="dim",
+    )
+    cond_grid.add_row(
+        "  ↳ Result for single-disc:",
+        "`Artist/Album/`",
+        style="dim",
+    )
+    cond_grid.add_row()
+    cond_grid.add_row(
+        "• Advanced (Subfolder for Classical):",
+        "`%{?composer,Classical/|Soundtracks/}/{albumartist}/{album}`",
+    )
+    cond_grid.add_row(
+        "  ↳ Result if composer exists:",
+        "`Classical/Artist/Album`",
+        style="dim",
+    )
+    cond_grid.add_row(
+        "  ↳ Result if no composer:",
+        "`Soundtracks/Artist/Album`",
+        style="dim",
+    )
+
+    cond_panel = Panel(
+        cond_grid,
+        title="[bold]Conditional Logic[/bold]",
+        border_style="green",
+        padding=(1, 2),
+    )
+
+    # --- Final Example ---
+    final_example = Text.from_markup(
+        """
+[bold]Default Template:[/bold]
+`{albumartist}/{album} ({year})/%{?is_multidisc,Disc {media_number}/|}{tracknumber}."
+" {tracktitle}.{ext}`
+
+[bold]Result:[/bold]
+`The Beatles/Abbey Road (1969)/07. Here Comes The Sun.flac`
+    """,
+        justify="left",
+    )
+    example_panel = Panel(
+        final_example,
+        title="[bold]Putting It All Together[/bold]",
+        border_style="yellow",
+        padding=(1, 2),
+    )
+
+    console.print(main_panel)
+    console.print(ph_table)
+    console.print(cond_panel)
+    console.print(example_panel)

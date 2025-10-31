@@ -88,7 +88,7 @@ class TrackArchive:
                     )
                     conn.commit()
                 log.info(
-                    f"[green]✓ Migrated {len(track_ids)} entries from the "
+                    f"[green]âœ“ Migrated {len(track_ids)} entries from the "
                     "text archive.[/green]"
                 )
 
@@ -218,3 +218,29 @@ class TrackArchive:
     async def vacuum(self) -> bool:
         """Optimizes the database file by rebuilding it."""
         return await self._run_in_executor(self._vacuum_sync)
+
+    def _clear_sync(self) -> bool:
+        """Synchronous implementation for clearing the archive."""
+        try:
+            # Get a connection and immediately close it. This helps ensure that any
+            # pooled connections are terminated before we delete the file.
+            conn = self._get_connection()
+            conn.close()
+
+            if os.path.exists(self.db_path):
+                os.remove(self.db_path)
+                log.info("Download archive database file removed.")
+
+            # Re-initialize the database to create an empty one for future use.
+            self._initialize_db()
+            return True
+        except (sqlite3.Error, OSError) as e:
+            log.error(f"Failed to clear the archive database: {e}")
+            return False
+
+    async def clear(self) -> bool:
+        """
+        Clears all records from the download archive by deleting and recreating the
+        database file.
+        """
+        return await self._run_in_executor(self._clear_sync)
