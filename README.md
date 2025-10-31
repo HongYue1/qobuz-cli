@@ -6,13 +6,13 @@
 
 A blazing fast, modern, and concurrent music downloader from Qobuz, designed for the command line.
 
-<!-- Screenshot 1 Placeholder: A screenshot showing a full discography download in progress with the Rich Live UI. -->
-![Screenshot of a download in progress](https://raw.githubusercontent.com/HongYue1/qobuz-cli/main/.github/assets/screenshot1.png)
+<img width="2233" height="1226" alt="Screenshot_2025-10-31_15-46-06" src="https://github.com/user-attachments/assets/8de1e460-76ed-4301-a4c2-88f472eb5106" />
 
-<!-- Screenshot 2 Placeholder: A screenshot showing the final summary panel after a download session. -->
-![Screenshot of the final summary panel](https://raw.githubusercontent.com/HongYue1/qobuz-cli/main/.github/assets/screenshot2.png)
+<img width="2233" height="1226" alt="Screenshot_2025-10-31_15-48-08(1)" src="https://github.com/user-attachments/assets/4fd03125-efa4-4dc3-8403-29b37b546679" />
 
-`qobuz-cli` (or its alias `qcli`) provides a powerful and elegant way to download your purchased music or streaming library from Qobuz. It leverages modern Python features like `asyncio` for high-speed concurrent downloads and presents progress with a rich, user-friendly interface.
+---
+
+`qobuz-cli` (or its alias `qcli`) provides a powerful and elegant way to download your purchased music or streaming library from Qobuz. It leverages modern Python features like `asyncio` for high-speed concurrent downloads and presents progress with a pretty, user-friendly interface.
 
 ## Key Features
 
