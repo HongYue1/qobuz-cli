@@ -1,8 +1,6 @@
 # qobuz-cli
 
 [![PyPI Version](https://img.shields.io/pypi/v/qobuz-cli.svg)](https://pypi.org/project/qobuz-cli)
-[![Python Versions](https://img.shields.io/pypi/pyversions/qobuz-cli.svg)](https://pypi.org/project/qobuz-cli)
-[![License](https://img.shields.io/pypi/l/qobuz-cli.svg)](https://github.com/HongYue1/qobuz-cli/blob/main/LICENSE)
 
 A blazing fast, modern, and concurrent music downloader from Qobuz, designed for the command line.
 
