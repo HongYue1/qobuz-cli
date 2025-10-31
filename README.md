@@ -31,7 +31,7 @@ pip install qobuz-cli
 ```
 or
 ```bash
-uv pip install qobuz-qcli
+uv pip install qobuz-cli
 ```
 
 ## Getting Started
