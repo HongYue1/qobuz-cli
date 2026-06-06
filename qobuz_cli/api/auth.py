@@ -131,6 +131,12 @@ class QobuzAuthenticator:
         """
         Tests if a single app secret is valid.
 
+        The secret is used to sign the ``track/getFileUrl`` request.  A 400
+        response means Qobuz explicitly rejected the signature, so the secret
+        is bad.  Any *other* HTTP error (404 track gone, 403 subscription
+        restriction, etc.) means the signed request was accepted by the server
+        — the secret is valid, the track or subscription is the problem.
+
         Args:
             secret: The app secret to test.
 
@@ -138,10 +144,22 @@ class QobuzAuthenticator:
             True if the secret is valid, False otherwise.
         """
         try:
-            # Use a known public and valid track ID for testing
             await self._api_client.api_call(
                 "track/getFileUrl", id=5966783, fmt_id=5, sec=secret
             )
             return True
-        except (InvalidAppSecretError, aiohttp.ClientError):
+        except InvalidAppSecretError:
+            # HTTP 400: Qobuz explicitly rejected the signature — bad secret.
+            return False
+        except aiohttp.ClientResponseError:
+            # Non-400 HTTP error (e.g. 404 track removed, 403 subscription).
+            # The signed request was accepted; the secret itself is valid.
+            log.debug(
+                "Secret test received a non-400 HTTP error; "
+                "signature was accepted — treating secret as valid."
+            )
+            return True
+        except aiohttp.ClientError:
+            # Network-level failure — cannot determine validity.
+            log.debug("Secret test failed due to a network error.")
             return False
