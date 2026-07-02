@@ -52,7 +52,13 @@ class PathFormatter:
         """
         template_vars = self._get_template_vars(track_meta, album_meta, file_extension)
         formatted_str = self._resolve_conditionals(self.template, template_vars)
-        final_str = formatted_str.format(**template_vars)
+        try:
+            final_str = formatted_str.format(**template_vars)
+        except KeyError as e:
+            raise ValueError(
+                f"Unknown placeholder {e} in output template. "
+                f"Valid placeholders: {', '.join(sorted(template_vars))}."
+            ) from e
         return Path(sanitize_filepath(final_str, platform="auto"))
 
     def _resolve_conditionals(

@@ -6,6 +6,7 @@ statistics.
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from typing import Any
 
@@ -84,6 +85,11 @@ class ProgressManager:
         self._current_albums: dict[str, dict[str, Any]] = {}
         self._overall_task_id: TaskID | None = None
         self._active_tasks: dict[TaskID, dict] = {}
+
+        # Throttle expensive full-layout rebuilds; the Live object still
+        # refreshes the last-built layout at its own refresh_per_second.
+        self._last_display_update = 0.0
+        self._display_min_interval = 0.1  # seconds (~10 rebuilds/sec)
 
     def log_message(self, message: str, level: str = "info"):
         """Unified logging respecting dry_run mode."""
@@ -293,12 +299,22 @@ class ProgressManager:
             border_style="green",
         )
 
-    def _update_display(self):
+    def _update_display(self, force: bool = False):
         """
-        Updates all panels in the layout, letting the Live object handle refresh rate.
+        Rebuilds all panels in the layout, letting the Live object handle the
+        actual on-screen refresh rate.
+
+        Rebuilds are throttled to a few times per second because they are
+        expensive; callers that change structure (task added/removed) pass
+        ``force=True`` so those changes appear immediately.
         """
         if self.dry_run or not self._layout:
             return
+
+        now = time.monotonic()
+        if not force and (now - self._last_display_update) < self._display_min_interval:
+            return
+        self._last_display_update = now
 
         self._layout["header"].update(self._generate_header())
         self._layout["stats"].update(self._generate_stats_panel())
@@ -369,7 +385,7 @@ class ProgressManager:
         self._stats["peak_concurrent"] = max(
             self._stats["peak_concurrent"], self._stats["active_downloads"]
         )
-        self._update_display()
+        self._update_display(force=True)
         return task_id
 
     def update_task_progress(self, task_id: TaskID, completed: int):
@@ -402,7 +418,7 @@ class ProgressManager:
                         + self._stats["skipped"]
                     ),
                 )
-            self._update_display()
+            self._update_display(force=True)
         except KeyError:
             pass
 
@@ -417,7 +433,7 @@ class ProgressManager:
                     + self._stats["skipped"]
                 ),
             )
-        self._update_display()
+        self._update_display(force=True)
 
     def get_statistics(self) -> dict[str, Any]:
         return self._stats.copy()
@@ -426,7 +442,7 @@ class ProgressManager:
         if self.dry_run:
             return self
         self._layout = self._create_layout()
-        self._update_display()
+        self._update_display(force=True)
         self._live = Live(
             self._layout,
             console=self.console,

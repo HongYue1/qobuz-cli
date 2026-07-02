@@ -3,6 +3,8 @@ Pydantic model for application configuration.
 Provides robust validation for all settings.
 """
 
+import re
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Maps user-friendly codes to API codes and provides metadata
@@ -136,10 +138,32 @@ class DownloadConfig(BaseModel):
             raise ValueError(
                 "Output template must contain at least {tracknumber} or {tracktitle}."
             )
+
+        allowed = {
+            "tracknumber",
+            "tracktitle",
+            "artist",
+            "artist_featuring",
+            "albumartist",
+            "album",
+            "year",
+            "media_number",
+            "ext",
+            "is_multidisc",
+            "composer",
+            "producer",
+        }
+        unknown = set(re.findall(r"{(\w+)}", v)) - allowed
+        if unknown:
+            raise ValueError(
+                "Output template contains unknown placeholder(s): "
+                f"{', '.join(sorted(unknown))}. "
+                f"Valid placeholders: {', '.join(sorted(allowed))}."
+            )
         return v
 
     @model_validator(mode="after")
-    def validate_auth_and_api_config(self) -> "DownloadConfig":
+    def validate_auth_and_api_config(self) -> DownloadConfig:
         """Validates that authentication and API settings are sufficient."""
         has_token = bool(self.token and self.token.strip())
         has_email_pass = bool(
@@ -166,7 +190,7 @@ class DownloadConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_option_conflicts(self) -> "DownloadConfig":
+    def validate_option_conflicts(self) -> DownloadConfig:
         """Checks for conflicting download options."""
         if self.no_cover and self.embed_art:
             raise ValueError("Cannot use --no-cover and --embed-art simultaneously.")

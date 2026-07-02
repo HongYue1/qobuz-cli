@@ -13,7 +13,7 @@ from typing import Any
 from rich.markup import escape
 
 from qobuz_cli.cli.progress_manager import ProgressManager
-from qobuz_cli.exceptions import FileIntegrityError
+from qobuz_cli.exceptions import FileIntegrityError, QobuzCliError
 from qobuz_cli.media import Downloader, FileIntegrityChecker, Tagger
 from qobuz_cli.models.config import DownloadConfig, get_quality_info
 from qobuz_cli.models.stats import DownloadStats
@@ -125,8 +125,9 @@ class TrackProcessor:
 
         # Download cover art if needed (optimized double-checked locking)
         if not self.config.no_cover:
-            album_id_str = str(album_meta.get("id"))
-            if album_id_str:
+            album_id_val = album_meta.get("id")
+            if album_id_val:
+                album_id_str = str(album_id_val)
                 cover_path = final_dir / "cover.jpg"
                 # First check (outside lock) for performance
                 path_exists = await asyncio.to_thread(cover_path.exists)
@@ -195,7 +196,7 @@ class TrackProcessor:
                 max_workers=self.config.max_workers,
             )
 
-            await asyncio.to_thread(
+            tag_success = await asyncio.to_thread(
                 self.tagger.tag_file,
                 str(temp_path),
                 str(final_path),
@@ -203,6 +204,10 @@ class TrackProcessor:
                 album_meta,
                 is_mp3,
             )
+            if not tag_success:
+                raise QobuzCliError(
+                    "Failed to write metadata tags to the downloaded file."
+                )
 
             is_valid = await (
                 FileIntegrityChecker.check_mp3_async(str(final_path))

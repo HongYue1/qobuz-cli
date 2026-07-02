@@ -47,19 +47,26 @@ class AdaptiveRateLimiter:
 
     async def acquire(self) -> None:
         """
-        Waits if necessary to respect the current rate limit before allowing a call
-        to proceed.
+        Waits if necessary to respect the current rate limit before allowing a
+        call to proceed.
+
+        The wait is computed while holding the lock but performed *after*
+        releasing it, so a slow caller's sleep does not serialize every other
+        concurrent caller. Each caller reserves its own slot by advancing
+        ``_last_call_time`` before sleeping.
         """
         async with self._lock:
+            now = time.monotonic()
+
             # Gradually recover the rate if no 429 errors have occurred recently
-            if time.monotonic() - self._last_429_time > 300:  # 5 minutes
+            if now - self._last_429_time > 300:  # 5 minutes
                 self._rate = min(self._max_rate, self._rate * 1.005)  # Slow recovery
                 self._min_interval = 1.0 / self._rate
 
-            now = asyncio.get_event_loop().time()
-            time_since_last = now - self._last_call_time
+            # Reserve the next slot: the earliest time this call may proceed.
+            scheduled_time = max(now, self._last_call_time + self._min_interval)
+            self._last_call_time = scheduled_time
+            wait_time = scheduled_time - now
 
-            if time_since_last < self._min_interval:
-                await asyncio.sleep(self._min_interval - time_since_last)
-
-            self._last_call_time = asyncio.get_event_loop().time()
+        if wait_time > 0:
+            await asyncio.sleep(wait_time)

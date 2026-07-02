@@ -23,7 +23,6 @@ from qobuz_cli.models.config import DownloadConfig
 from qobuz_cli.models.stats import DownloadStats
 from qobuz_cli.storage.archive import TrackArchive
 from qobuz_cli.storage.cache import CacheManager
-from qobuz_cli.utils.batch_fetcher import BatchMetadataFetcher
 from qobuz_cli.utils.discography import smart_discography_filter
 from qobuz_cli.utils.formatting import extract_artist_name
 from qobuz_cli.utils.path import create_dir, parse_qobuz_url
@@ -58,7 +57,6 @@ class DownloadManager:
             Tagger(config.embed_art),
             progress_manager,
         )
-        self.batch_fetcher = BatchMetadataFetcher(api_client, max_concurrent=10)
 
         def cache_stats_callback(is_hit: bool):
             if is_hit:
@@ -303,7 +301,7 @@ class DownloadManager:
                 self.cache.set(cache_key, track_meta)
 
         archive_status = {}
-        if self.config.download_archive:
+        if self.config.download_archive and not self.config.dry_run:
             archive_status = await self.archive.check_if_tracks_exist([str(track_id)])
 
         if archive_status.get(str(track_id)):
@@ -421,11 +419,15 @@ class DownloadManager:
         )
         self.stats.albums_processed.add(f"playlist_{playlist_id}")
 
-        for track in all_tracks:
-            album_meta = track.get("album", {})
-            await self._get_and_process_track(
-                track, album_meta, output_dir_override=playlist_dir
+        playlist_tasks = [
+            self._get_and_process_track(
+                track,
+                track.get("album", {}),
+                output_dir_override=playlist_dir,
             )
+            for track in all_tracks
+        ]
+        await asyncio.gather(*playlist_tasks)
 
         if not self.config.no_m3u and not self.config.dry_run:
             generate_m3u(playlist_dir)
@@ -514,7 +516,7 @@ class DownloadManager:
                     if self.config.download_archive:
                         await self.archive.add_tracks([processed_meta])
                     return processed_meta
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 self.stats.tracks_failed += 1
                 log.error(
                     "[red]  ✗ Network error for track "
@@ -567,7 +569,7 @@ class DownloadManager:
             ):
                 response.raise_for_status()
                 html = await response.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        except (TimeoutError, aiohttp.ClientError) as e:
             log.error(f"[red]Failed to fetch Last.fm playlist: {e}[/red]")
             return
 
@@ -583,8 +585,14 @@ class DownloadManager:
             log.warning("[yellow]No tracks found on Last.fm page.[/yellow]")
             return
 
+        if len(artists) != len(titles):
+            log.warning(
+                "[yellow]Last.fm page returned mismatched artist/title counts "
+                f"({len(artists)} artists, {len(titles)} titles); pairing up to "
+                "the shorter list.[/yellow]"
+            )
         search_queries = [
-            f"{artist} {title}" for artist, title in zip(artists, titles, strict=True)
+            f"{artist} {title}" for artist, title in zip(artists, titles, strict=False)
         ]
         log.info(f"Found {len(search_queries)} tracks. Searching for them on Qobuz...")
 

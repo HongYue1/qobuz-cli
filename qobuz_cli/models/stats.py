@@ -25,6 +25,7 @@ class DownloadStats:
     current_speed_bps: float = 0.0
     peak_speed_bps: float = 0.0
     _speed_samples: list[float] = field(default_factory=list, repr=False)
+    _session_bytes: int = field(default=0, repr=False)
     _last_progress_time: float = field(default=0.0, repr=False)
     _last_progress_bytes: int = field(default=0, repr=False)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
@@ -32,22 +33,26 @@ class DownloadStats:
     def __post_init__(self):
         self._last_progress_time = time.monotonic()
 
-    async def update_speed_stats(
-        self, total_bytes_so_far: int, progress_manager=None
-    ) -> None:
+    async def record_progress(self, chunk_bytes: int, progress_manager=None) -> None:
         """
-        Updates the download speed based on progress. This method is now async-safe.
+        Records freshly downloaded bytes and updates the real-time speed.
+
+        Unlike a per-file counter, this accumulates a single session-wide byte
+        total across all concurrent downloads, so the computed speed reflects
+        true aggregate throughput. Async-safe.
 
         Args:
-            total_bytes_so_far: The cumulative total of bytes downloaded in the session.
+            chunk_bytes: Number of bytes downloaded since the last call.
+            progress_manager: Optional manager to forward speed stats to.
         """
         async with self._lock:
+            self._session_bytes += chunk_bytes
             now = time.monotonic()
             elapsed = now - self._last_progress_time
 
             # Update speed roughly twice per second
             if elapsed > 0.5:
-                bytes_diff = total_bytes_so_far - self._last_progress_bytes
+                bytes_diff = self._session_bytes - self._last_progress_bytes
                 if bytes_diff > 0 and elapsed > 0:
                     speed = bytes_diff / elapsed
                     self._speed_samples.append(speed)
@@ -73,4 +78,4 @@ class DownloadStats:
                             )
 
                 self._last_progress_time = now
-                self._last_progress_bytes = total_bytes_so_far
+                self._last_progress_bytes = self._session_bytes

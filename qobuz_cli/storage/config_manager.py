@@ -30,7 +30,7 @@ class ConfigManager:
 
     def __init__(self, config_file_path: Path):
         self.config_file_path = config_file_path
-        self._parser = configparser.ConfigParser()
+        self._parser = configparser.ConfigParser(interpolation=None)
 
     def load_config(self, cli_options: dict[str, Any] | None = None) -> DownloadConfig:
         """
@@ -82,7 +82,7 @@ class ConfigManager:
         Args:
             settings: A dictionary of settings to save.
         """
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config["DEFAULT"] = {}
 
         # Get all possible keys from the model to create a complete default config
@@ -105,8 +105,8 @@ class ConfigManager:
             elif isinstance(value, list):
                 config["DEFAULT"][key] = ",".join(map(str, value))
             elif key == "output_template" and value:
-                # configparser uses % for interpolation, so we must escape it
-                config["DEFAULT"][key] = str(value).replace("%", "%%")
+                # Interpolation is disabled, so "%" needs no escaping.
+                config["DEFAULT"][key] = str(value)
             elif value is not None:
                 config["DEFAULT"][key] = str(value)
 
@@ -130,7 +130,9 @@ class ConfigManager:
             ],
             "quality": section.getint("quality", 2),
             "max_workers": section.getint("max_workers", 8),
-            "output_template": section.get("output_template", DEFAULT_OUTPUT_TEMPLATE),
+            "output_template": (
+                section.get("output_template", DEFAULT_OUTPUT_TEMPLATE) or ""
+            ).replace("%%", "%"),
             "embed_art": section.getboolean("embed_art", False),
             "no_cover": section.getboolean("no_cover", False),
             "og_cover": section.getboolean("og_cover", False),
@@ -165,7 +167,7 @@ class ConfigManager:
                 elif isinstance(default_value, list):
                     config_section[key] = ",".join(map(str, default_value))
                 elif key == "output_template":
-                    config_section[key] = DEFAULT_OUTPUT_TEMPLATE.replace("%", "%%")
+                    config_section[key] = DEFAULT_OUTPUT_TEMPLATE
                 else:
                     config_section[key] = str(default_value)
 

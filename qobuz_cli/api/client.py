@@ -2,6 +2,7 @@
 Enhanced API client with compression for metadata and circuit breaker protection.
 """
 
+import asyncio
 import hashlib
 import logging
 import time
@@ -22,6 +23,27 @@ from .auth import QobuzAuthenticator
 from .rate_limiter import AdaptiveRateLimiter
 
 log = logging.getLogger(__name__)
+
+
+def _is_expected_client_error(exc: BaseException) -> bool:
+    """
+    Returns True for errors that mean the API responded but rejected the
+    request for client-side reasons (auth/quality/4xx). These must not count as
+    circuit-breaker failures -- the service itself is healthy.
+    """
+    if isinstance(
+        exc,
+        (
+            AuthenticationError,
+            InvalidAppIdError,
+            InvalidAppSecretError,
+            InvalidQualityError,
+        ),
+    ):
+        return True
+    if isinstance(exc, aiohttp.ClientResponseError):
+        return 400 <= exc.status < 500 and exc.status != 429
+    return False
 
 
 class QobuzAPIClient:
@@ -64,6 +86,7 @@ class QobuzAPIClient:
             failure_threshold=5,
             recovery_timeout=60,
             success_threshold=2,
+            ignore_predicate=_is_expected_client_error,
         )
 
     @property
@@ -129,6 +152,9 @@ class QobuzAPIClient:
             "intent": "stream",
         }
 
+    # Number of attempts for transient failures (429/5xx/network).
+    MAX_API_ATTEMPTS = 3
+
     async def api_call(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """
         Makes an authenticated API call with rate limiting, retry logic, and
@@ -142,53 +168,7 @@ class QobuzAPIClient:
         # Check circuit breaker before making request
         try:
             async with self._circuit_breaker:
-                await self._rate_limiter.acquire()
-
-                params = kwargs.copy()
-
-                if endpoint == "track/getFileUrl":
-                    params = self._prepare_get_file_url_params(
-                        track_id=params.pop("id"),
-                        format_id=params.pop("fmt_id"),
-                        secret_override=params.pop("sec", None),
-                    )
-
-                if self.user_auth_token:
-                    params["user_auth_token"] = self.user_auth_token
-
-                async with self._session.get(
-                    self.BASE_URL + endpoint, params=params
-                ) as r:
-                    # Check if response was compressed (for logging)
-                    was_compressed = r.headers.get("Content-Encoding") in (
-                        "gzip",
-                        "deflate",
-                        "br",
-                    )
-                    if was_compressed:
-                        log.debug(
-                            f"API response for {endpoint} was compressed "
-                            f"({r.headers.get('Content-Encoding')})"
-                        )
-
-                    if r.status == 429:
-                        await self._rate_limiter.on_429()
-                        r.raise_for_status()
-
-                    if endpoint == "user/login":
-                        if r.status == 401:
-                            raise AuthenticationError("Invalid email or password.")
-                        if r.status == 400 and "Invalid application" in await r.text():
-                            raise InvalidAppIdError("The provided App ID is invalid.")
-
-                    if endpoint == "track/getFileUrl" and r.status == 400:
-                        raise InvalidAppSecretError(
-                            "The app secret is invalid or has expired."
-                        )
-
-                    r.raise_for_status()
-                    return await r.json()
-
+                return await self._request_with_retry(endpoint, kwargs)
         except CircuitBreakerError as e:
             log.error(f"[red]Circuit breaker is open for API calls: {e}[/red]")
             raise
@@ -196,9 +176,96 @@ class QobuzAPIClient:
             log.debug(f"API call to {endpoint} failed: {e}")
             raise
 
+    async def _request_with_retry(
+        self, endpoint: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Executes a single API request, retrying transient failures (HTTP 429,
+        5xx, and network/timeout errors) with exponential backoff. Client-side
+        4xx errors are raised immediately without retrying.
+        """
+        delay = 1.0
+        last_exc: Exception | None = None
+        for attempt in range(1, self.MAX_API_ATTEMPTS + 1):
+            try:
+                return await self._do_request(endpoint, params)
+            except aiohttp.ClientResponseError as e:
+                last_exc = e
+                is_retryable = e.status == 429 or 500 <= e.status < 600
+                if not is_retryable or attempt == self.MAX_API_ATTEMPTS:
+                    raise
+                log.debug(
+                    f"Transient HTTP {e.status} on {endpoint} "
+                    f"(attempt {attempt}/{self.MAX_API_ATTEMPTS}); "
+                    f"retrying in {delay:.1f}s."
+                )
+            except (aiohttp.ClientError, TimeoutError) as e:
+                last_exc = e
+                if attempt == self.MAX_API_ATTEMPTS:
+                    raise
+                log.debug(
+                    f"Network error on {endpoint} "
+                    f"(attempt {attempt}/{self.MAX_API_ATTEMPTS}): {e}; "
+                    f"retrying in {delay:.1f}s."
+                )
+            await asyncio.sleep(delay)
+            delay *= 2
+
+        # Unreachable in practice: the final attempt always raises above.
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"API call to {endpoint} exhausted all retries.")
+
+    async def _do_request(
+        self, endpoint: str, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Performs one rate-limited HTTP request and parses the JSON body."""
+        await self._rate_limiter.acquire()
+
+        params = kwargs.copy()
+
+        if endpoint == "track/getFileUrl":
+            params = self._prepare_get_file_url_params(
+                track_id=params.pop("id"),
+                format_id=params.pop("fmt_id"),
+                secret_override=params.pop("sec", None),
+            )
+
+        if self.user_auth_token:
+            params["user_auth_token"] = self.user_auth_token
+
+        async with self._session.get(self.BASE_URL + endpoint, params=params) as r:
+            # Check if response was compressed (for logging)
+            was_compressed = r.headers.get("Content-Encoding") in (
+                "gzip",
+                "deflate",
+                "br",
+            )
+            if was_compressed:
+                log.debug(
+                    f"API response for {endpoint} was compressed "
+                    f"({r.headers.get('Content-Encoding')})"
+                )
+
+            if r.status == 429:
+                await self._rate_limiter.on_429()
+                r.raise_for_status()
+
+            if endpoint == "user/login":
+                if r.status == 401:
+                    raise AuthenticationError("Invalid email or password.")
+                if r.status == 400 and "Invalid application" in await r.text():
+                    raise InvalidAppIdError("The provided App ID is invalid.")
+
+            if endpoint == "track/getFileUrl" and r.status == 400:
+                raise InvalidAppSecretError("The app secret is invalid or has expired.")
+
+            r.raise_for_status()
+            return await r.json()
+
     async def _yield_paginated(
         self, endpoint: str, item_key: str, **kwargs: Any
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any]]:
         """
         Generator for handling paginated API endpoints.
         """
@@ -221,7 +288,12 @@ class QobuzAPIClient:
             yield response
 
             offset += items_in_response
-            if offset >= total_items:
+
+            # A short page reliably signals the end, regardless of whether the
+            # API returned a usable "<item>_count" total (it sometimes doesn't).
+            if items_in_response < limit:
+                break
+            if total_items and offset >= total_items:
                 break
 
     # Public API Methods
@@ -236,21 +308,21 @@ class QobuzAPIClient:
 
     def fetch_artist_discography(
         self, artist_id: str
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any]]:
         return self._yield_paginated(
             "artist/get", item_key="albums", artist_id=artist_id, extra="albums"
         )
 
     def fetch_playlist_tracks(
         self, playlist_id: str
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any]]:
         return self._yield_paginated(
             "playlist/get", item_key="tracks", playlist_id=playlist_id, extra="tracks"
         )
 
     def fetch_label_discography(
         self, label_id: str
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any]]:
         return self._yield_paginated(
             "label/get", item_key="albums", label_id=label_id, extra="albums"
         )

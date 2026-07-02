@@ -6,6 +6,7 @@ Place this file at: qobuz_cli/utils/circuit_breaker.py
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from enum import Enum
 
 log = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
         success_threshold: int = 2,
+        ignore_predicate: Callable[[BaseException], bool] | None = None,
     ):
         """
         Initialize circuit breaker.
@@ -46,10 +48,14 @@ class CircuitBreaker:
             failure_threshold: Number of failures before opening circuit
             recovery_timeout: Seconds to wait before attempting recovery
             success_threshold: Consecutive successes needed to close circuit
+            ignore_predicate: Optional callable that returns True for an
+                exception representing an expected, client-side outcome (e.g. an
+                HTTP 4xx response) that must not count as a circuit failure.
         """
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.success_threshold = success_threshold
+        self._ignore_predicate = ignore_predicate
 
         self._state = CircuitState.CLOSED
         self._failure_count = 0
@@ -130,7 +136,11 @@ class CircuitBreaker:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit context, handle success or failure."""
-        if exc_type:
+        if exc_val is not None:
+            # Expected client-side errors (e.g. HTTP 4xx) mean the service is
+            # responding, so they must not trip the breaker.
+            if self._ignore_predicate is not None and self._ignore_predicate(exc_val):
+                return
             await self._on_failure()
         else:
             await self._on_success()

@@ -26,7 +26,7 @@ class QobuzAuthenticator:
     Manages the authentication flow for the Qobuz API client.
     """
 
-    def __init__(self, api_client: "QobuzAPIClient"):
+    def __init__(self, api_client: QobuzAPIClient):
         """
         Initializes the authenticator.
 
@@ -111,12 +111,14 @@ class QobuzAuthenticator:
 
         log.debug(f"Testing {len(self._api_client.secrets)} potential app secrets...")
 
-        test_tasks = [
-            self._test_secret(secret) for secret in self._api_client.secrets if secret
-        ]
-        results = await asyncio.gather(*test_tasks)
+        # Only test non-empty secrets, and keep the tested list aligned with the
+        # results so a falsy secret can never desynchronize the zip below.
+        valid_candidates = [s for s in self._api_client.secrets if s]
+        results = await asyncio.gather(
+            *(self._test_secret(secret) for secret in valid_candidates)
+        )
 
-        for secret, is_valid in zip(self._api_client.secrets, results, strict=True):
+        for secret, is_valid in zip(valid_candidates, results, strict=True):
             if is_valid:
                 self._api_client.app_secret = secret
                 log.debug(f"Valid secret found: {secret[:8]}...")

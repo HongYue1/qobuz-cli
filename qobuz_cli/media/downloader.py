@@ -125,15 +125,23 @@ class Downloader:
                         bytes_downloaded = 0
                         last_speed_check = asyncio.get_event_loop().time()
                         chunk_size = self._shared_chunk_size
+                        stream = response.content
 
-                        async for chunk in response.content.iter_chunked(chunk_size):
+                        # Manual read loop (instead of iter_chunked) so an
+                        # adapted chunk size actually takes effect mid-download.
+                        while True:
+                            chunk = await stream.read(chunk_size)
+                            if not chunk:
+                                break
                             await f.write(chunk)
                             bytes_downloaded += len(chunk)
 
                             if stats:
-                                await stats.update_speed_stats(
-                                    stats.total_size_downloaded + bytes_downloaded,
-                                    progress_manager,
+                                # Report only this chunk's bytes; DownloadStats
+                                # aggregates them into a session-wide counter for
+                                # accurate concurrent speed measurement.
+                                await stats.record_progress(
+                                    len(chunk), progress_manager
                                 )
                                 now = asyncio.get_event_loop().time()
                                 if now - last_speed_check > 2.0:
@@ -147,7 +155,7 @@ class Downloader:
                                     task_id, completed=bytes_downloaded
                                 )
                 return
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 last_exception = e
                 log.debug(
                     f"Download attempt {attempt}/{self.max_attempts} for "
