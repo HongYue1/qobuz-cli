@@ -313,16 +313,12 @@ class QobuzAPIClient:
             "artist/get", item_key="albums", artist_id=artist_id, extra="albums"
         )
 
-    def fetch_playlist_tracks(
-        self, playlist_id: str
-    ) -> AsyncGenerator[dict[str, Any]]:
+    def fetch_playlist_tracks(self, playlist_id: str) -> AsyncGenerator[dict[str, Any]]:
         return self._yield_paginated(
             "playlist/get", item_key="tracks", playlist_id=playlist_id, extra="tracks"
         )
 
-    def fetch_label_discography(
-        self, label_id: str
-    ) -> AsyncGenerator[dict[str, Any]]:
+    def fetch_label_discography(self, label_id: str) -> AsyncGenerator[dict[str, Any]]:
         return self._yield_paginated(
             "label/get", item_key="albums", label_id=label_id, extra="albums"
         )

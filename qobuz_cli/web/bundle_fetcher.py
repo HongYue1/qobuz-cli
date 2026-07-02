@@ -44,8 +44,18 @@ class BundleFetcher:
         """
         Fetches the bundle from the Qobuz website with retry logic.
         """
-        timeout = aiohttp.ClientTimeout(total=45, connect=15)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        timeout = aiohttp.ClientTimeout(total=60, connect=20)
+        # A realistic browser User-Agent avoids Qobuz's edge/CDN returning a
+        # challenge page or rejecting the default aiohttp user agent.
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
             for attempt in range(1, max_retries + 1):
                 try:
                     log.debug(
@@ -78,11 +88,21 @@ class BundleFetcher:
                     )
                     return cls(bundle_text)
 
-                except (aiohttp.ClientError, ValueError, RuntimeError) as e:
-                    log.warning(f"Bundle fetch attempt {attempt} failed: {e}")
+                except (
+                    aiohttp.ClientError,
+                    TimeoutError,
+                    ValueError,
+                    RuntimeError,
+                ) as e:
+                    # str(TimeoutError()) is empty, so surface the type name too.
+                    detail = str(e) or type(e).__name__
+                    log.warning(f"Bundle fetch attempt {attempt} failed: {detail}")
                     if attempt == max_retries:
                         raise RuntimeError(
-                            f"Failed to fetch bundle after {max_retries} attempts."
+                            f"Failed to fetch Qobuz bundle after {max_retries} "
+                            f"attempts (last error: {detail}). Qobuz may be "
+                            "unreachable from your network, or the web player "
+                            "layout changed."
                         ) from e
                     await asyncio.sleep(2**attempt)
 

@@ -178,7 +178,8 @@ def init(
             secrets = list(bundle.extract_secrets().values())
             console.print("[green]✓ Secrets fetched successfully.[/green]")
         except Exception as e:
-            console.print(f"[red]✗ Failed to fetch secrets: {e}[/red]")
+            detail = str(e) or type(e).__name__
+            console.print(f"[red]✗ Failed to fetch secrets: {detail}[/red]")
             raise typer.Exit(code=1) from e
         settings = {"app_id": app_id, "secrets": secrets}
         if len(credentials) == 1:
