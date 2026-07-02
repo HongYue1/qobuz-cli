@@ -8,7 +8,7 @@ version = "v0.0.2"
 authors = [{ name = "HongYue1", email = "moonlord369@gmail.com" }]
 description = " Blazing fast Qobuz CLI downloader with modern UI"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E.*"]
 keywords = ["qobuz", "music", "downloader", "cli", "audio"]
@@ -24,14 +24,14 @@ classifiers = [
 ]
 
 dependencies = [
-    "aiofiles",
-    "aiohttp",
-    "beautifulsoup4",
-    "mutagen",
-    "pathvalidate",
-    "pydantic",
-    "rich",
-    "typer",
+    "aiofiles>=25.1.0",
+    "aiohttp>=3.14.1",
+    "beautifulsoup4>=4.15.0",
+    "mutagen>=1.48.1",
+    "pathvalidate>=3.3.1",
+    "pydantic>=2.13.4",
+    "rich>=15.0.0",
+    "typer>=0.26.8",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +48,7 @@ qcli = "qobuz_cli.__main__:main"
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py314"
 
 [tool.ruff.lint]
 preview = true
