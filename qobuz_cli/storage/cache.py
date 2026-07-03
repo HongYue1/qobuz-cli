@@ -143,8 +143,7 @@ class CacheManager:
                 )
                 return False
 
-            with open(cache_path, "w", encoding="utf-8") as f:
-                f.write(serialized_payload)
+            Path(cache_path).write_text(serialized_payload, encoding="utf-8")
             return True
         except (TypeError, OSError) as e:
             log.warning(f"Cache write failed for key '{key}': {e}")

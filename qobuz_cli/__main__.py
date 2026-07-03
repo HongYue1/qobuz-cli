@@ -22,7 +22,7 @@ def main() -> None:
         try:
             sys.stdout.reconfigure(encoding="utf-8")
             sys.stderr.reconfigure(encoding="utf-8")
-        except TypeError, AttributeError:
+        except (TypeError, AttributeError):
             pass
 
     log = logging.getLogger("qobuz_cli")
@@ -30,9 +30,9 @@ def main() -> None:
 
     try:
         app()
-    except typer.Exit, typer.Abort:
+    except (typer.Exit, typer.Abort):
         pass
-    except KeyboardInterrupt, asyncio.CancelledError:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         console.print("\n[yellow]⚠️  Operation cancelled by user.[/yellow]")
         sys.exit(0)
     except QobuzCliError as e:

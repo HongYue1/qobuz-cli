@@ -5,6 +5,7 @@ Handles parsing of Qobuz metadata and writing it as tags to media files.
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any, ClassVar
 
 import mutagen.id3 as id3
@@ -241,8 +242,7 @@ class Tagger:
         pic = Picture()
         pic.type = 3
         pic.mime = "image/jpeg"
-        with open(cover_path, "rb") as f:
-            pic.data = f.read()
+        pic.data = Path(cover_path).read_bytes()
 
         audio.clear_pictures()
         audio.add_picture(pic)
@@ -252,11 +252,11 @@ class Tagger:
         if not os.path.isfile(cover_path):
             return
 
-        with open(cover_path, "rb") as f:
-            if "APIC:" in audio:
-                del audio["APIC:"]
-            audio.add(
-                id3.APIC(
-                    encoding=3, mime="image/jpeg", type=3, desc="Cover", data=f.read()
-                )
+        cover_data = Path(cover_path).read_bytes()
+        if "APIC:" in audio:
+            del audio["APIC:"]
+        audio.add(
+            id3.APIC(
+                encoding=3, mime="image/jpeg", type=3, desc="Cover", data=cover_data
             )
+        )

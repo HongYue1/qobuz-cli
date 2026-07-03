@@ -8,6 +8,7 @@ import base64
 import logging
 import re
 from collections import OrderedDict
+from typing import Self
 
 import aiohttp
 
@@ -40,7 +41,7 @@ class BundleFetcher:
         self._bundle_content = bundle_content
 
     @classmethod
-    async def fetch(cls, max_retries: int = 3) -> BundleFetcher:
+    async def fetch(cls, max_retries: int = 3) -> Self:
         """
         Fetches the bundle from the Qobuz website with retry logic.
         """

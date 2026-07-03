@@ -40,15 +40,22 @@ def generate_m3u(playlist_directory: Path) -> bool:
             length = int(audio.info.length) if audio and audio.info else -1
             artist = audio.get("artist", ["Unknown Artist"])[0]
             title = audio.get("title", [audio_path.stem])[0]
-            content.append(f"#EXTINF:{length},{artist} - {title}")
-            content.append(str(audio_path.relative_to(playlist_directory).as_posix()))
+            content.extend(
+                (
+                    f"#EXTINF:{length},{artist} - {title}",
+                    str(audio_path.relative_to(playlist_directory).as_posix()),
+                )
+            )
         except MutagenError:
-            content.append(f"#EXTINF:-1,{audio_path.stem}")
-            content.append(str(audio_path.relative_to(playlist_directory).as_posix()))
+            content.extend(
+                (
+                    f"#EXTINF:-1,{audio_path.stem}",
+                    str(audio_path.relative_to(playlist_directory).as_posix()),
+                )
+            )
 
     try:
-        with open(playlist_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(content))
+        Path(playlist_path).write_text("\n".join(content), encoding="utf-8")
         log.info(f"Generated playlist: '{playlist_path}'")
         return True
     except OSError as e:

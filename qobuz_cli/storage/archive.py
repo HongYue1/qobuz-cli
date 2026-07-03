@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import sqlite3
+from itertools import batched
 from pathlib import Path
 from typing import Any
 
@@ -117,8 +118,7 @@ class TrackArchive:
         results = {}
         try:
             with self._get_connection() as conn:
-                for i in range(0, len(track_ids), BATCH_SIZE):
-                    chunk = track_ids[i : i + BATCH_SIZE]
+                for chunk in batched(track_ids, BATCH_SIZE):
                     placeholders = ",".join("?" * len(chunk))
                     query = (
                         "SELECT track_id FROM downloaded_tracks WHERE track_id IN"  # noqa: S608
@@ -156,8 +156,7 @@ class TrackArchive:
         BATCH_SIZE = 500
         try:
             with self._get_connection() as conn:
-                for i in range(0, len(records), BATCH_SIZE):
-                    chunk = records[i : i + BATCH_SIZE]
+                for chunk in batched(records, BATCH_SIZE):
                     conn.executemany(
                         "INSERT OR IGNORE INTO downloaded_tracks "
                         "(track_id, artist, album, title) VALUES (?, ?, ?, ?)",

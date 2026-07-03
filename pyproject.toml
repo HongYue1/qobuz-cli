@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qobuz-cli"
-version = "0.0.3"
+version = "0.0.4"
 authors = [{ name = "HongYue1", email = "moonlord369@gmail.com" }]
 description = " Blazing fast Qobuz CLI downloader with modern UI"
 readme = "README.md"
@@ -34,9 +34,6 @@ dependencies = [
     "typer>=0.26.8",
 ]
 
-[project.optional-dependencies]
-dev = ["ruff>=0.10.0", "jsonschema"]
-
 [project.urls]
 Homepage = "https://github.com/HongYue1/qobuz-cli"
 Repository = "https://github.com/HongYue1/qobuz-cli"
@@ -45,6 +42,9 @@ Repository = "https://github.com/HongYue1/qobuz-cli"
 [project.scripts]
 qobuz-cli = "qobuz_cli.__main__:main"
 qcli = "qobuz_cli.__main__:main"
+
+[dependency-groups]
+dev = ["ruff>=0.10.0", "jsonschema"]
 
 [tool.ruff]
 line-length = 88
@@ -67,6 +67,9 @@ select = [
     "ASYNC", # flake8-async
     "S",     # flake8-bandit
     "F541",  # f-string-missing-placeholders
+    "PERF",  # perflint (performance anti-patterns)
+    "RET",   # flake8-return (cleaner returns)
+    "FURB",  # refurb (modern idioms)
 ]
 
 
@@ -82,3 +85,10 @@ known-first-party = ["qobuz_cli"]
 "__init__.py" = ["F401"]
 # Relax security rules in tests
 # "tests/**" = ["S"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
