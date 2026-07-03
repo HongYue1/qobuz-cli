@@ -54,6 +54,9 @@ You need to authenticate once before downloading. Qobuz has blocked direct email
 5. Find the **`localuser`** key.
 6. Expand its JSON value and copy the **`token`** string.
 
+<img width="2556" height="1512" alt="2026-07-03_14-12" src="https://github.com/user-attachments/assets/7e91dee5-65e7-4318-8e59-841c45ab372d" />
+
+
 Then run:
 
 ```bash
