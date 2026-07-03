@@ -88,7 +88,7 @@ def print_config(config_path: Path, config_data: dict[str, Any]):
     console = Console()
     content = ""
     for key, value in config_data.items():
-        if key in ("token", "password", "secrets"):
+        if key in ("token", "secrets"):
             value = "[hidden]"
         elif isinstance(value, list):
             value = ", ".join(value)
@@ -110,7 +110,7 @@ def print_validation_table(config: DownloadConfig):
     table.add_column(style="bold cyan")
     table.add_column()
 
-    auth_method = "Token" if config.token else "Email/Password"
+    auth_method = "Token"
     quality_info = QUALITY_MAP.get(config.quality, {})
     quality_name = quality_info.get("name", "Unknown")
     user_code = quality_info.get("user_code", "?")

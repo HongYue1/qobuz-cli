@@ -14,7 +14,7 @@ A blazing fast, modern, and concurrent music downloader from Qobuz, designed for
 
 ## Key Features
 
--   **Multiple ways to log in**: Supports both `token` and `Email Password` to login.
+-   **Simple token-based login**: Authenticate securely with your Qobuz auth token.
 -   **High-Speed Concurrent Downloads**: Utilizes `asyncio` to download multiple tracks simultaneously, maximizing your bandwidth.
 -   **Rich, Modern UI**: Beautiful and informative progress bars and summaries powered by the Rich library.
 -   **Download Everything**: Supports albums, tracks, artists, playlists, and even entire label discographies.
@@ -38,19 +38,37 @@ uv pip install qobuz-cli
 
 ### 1. Initialize Your Configuration
 
-Before you can download, you need to authenticate with your Qobuz account. You only need to do this once. You can use either a token or your email and password.
+Before you can download, you need to authenticate with your Qobuz account. You only need to do this once.
 
-**Option A: Authenticate with Email & Password (Recommended)**
-```bash
-qcli init your-email@domain.com "your-password"
-```
+> **Note:** Qobuz has blocked direct email/password logins for third-party applications, so `qobuz-cli` authenticates using your browser's **Auth Token**.
 
-**Option B: Authenticate with a Token**
-You can find a token by inspecting the network requests in your web browser's developer tools while logged into the Qobuz web player.
+#### 🔑 How to get your Auth Token
+
+1. Open the [Qobuz Web Player](https://play.qobuz.com/) in your browser and log in.
+2. Press `F12` to open the Developer Tools.
+3. Go to the **Application** tab (Chrome/Edge) or **Storage** tab (Firefox).
+4. In the left sidebar, expand **Local Storage** and click on `https://play.qobuz.com`.
+5. In the list of keys, find **`localuser`**.
+6. Expand the JSON value and copy the **`token`** string.
+
+Then initialize `qobuz-cli` with that token:
+
 ```bash
 qcli init <YOUR_AUTH_TOKEN>
 ```
-This will create a `config.ini` file in your system's configuration directory.
+
+This fetches the required API secrets from the Qobuz web player and creates a `config.ini` file in your system's configuration directory.
+
+<details>
+<summary>Advanced: provide the App ID and secret manually</summary>
+
+If the automatic secret fetch ever fails (for example, if Qobuz changes their web player), you can supply the app credentials yourself. Both flags are required together:
+
+```bash
+qcli init <YOUR_AUTH_TOKEN> --app-id <APP_ID> --app-secret <APP_SECRET>
+```
+
+</details>
 
 ### 2. Start Downloading
 
@@ -149,8 +167,9 @@ qcli download --dry-run  <URL_PLACEHOLDER_ARTIST>
 
 ## Commands Reference
 
--   `qcli init`: Initialize configuration with your Qobuz credentials.
+-   `qcli init <TOKEN>`: Initialize configuration with your Qobuz auth token.
     -   `--force`: Overwrite an existing configuration file without asking.
+    -   `--app-id` / `--app-secret`: Provide the API credentials manually instead of auto-fetching them (both required together).
 -   `qcli download [URLS...]`: Download music from Qobuz URLs.
     -   `-s, --smart`: Filter discographies to remove duplicate albums.
     -   `-q, --quality`: Set audio quality (1-4).

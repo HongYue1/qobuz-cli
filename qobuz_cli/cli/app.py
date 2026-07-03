@@ -4,7 +4,6 @@ Enhanced with stdin URL processing support.
 """
 
 import asyncio
-import hashlib
 import logging
 import os
 import sys
@@ -160,16 +159,26 @@ def main_callback(
 
 @app.command()
 def init(
-    credentials: list[str] = typer.Argument(  # noqa: B008
+    token: str = typer.Argument(
         ...,
-        help="Authentication token OR email and password.",
-        metavar="<TOKEN> | <EMAIL> <PASSWORD>",
+        help="Your Qobuz auth token (see the README for how to find it).",
+        metavar="<TOKEN>",
     ),
     force: bool = typer.Option(
         False, "--force", "-f", help="Overwrite existing credentials without asking."
     ),
+    app_id: str | None = typer.Option(
+        None,
+        "--app-id",
+        help="Provide the Qobuz app ID manually (skips the web-player fetch).",
+    ),
+    app_secret: str | None = typer.Option(
+        None,
+        "--app-secret",
+        help="Provide the Qobuz app secret manually (requires --app-id).",
+    ),
 ):
-    """Initialize configuration with Qobuz credentials."""
+    """Initialize configuration with your Qobuz token."""
     if (
         CONFIG_FILE.exists()
         and not force
@@ -179,31 +188,37 @@ def init(
     ):
         raise typer.Abort()
 
+    if bool(app_id) != bool(app_secret):
+        console.print(
+            "[red]✗ --app-id and --app-secret must be provided together.[/red]"
+        )
+        raise typer.Exit(code=1)
+
     async def _init_async():
-        console.print("\n[cyan]Fetching API secrets from Qobuz web player...[/cyan]")
-        try:
-            bundle = await BundleFetcher.fetch()
-            app_id = bundle.extract_app_id()
-            secrets = list(bundle.extract_secrets().values())
-            console.print("[green]✓ Secrets fetched successfully.[/green]")
-        except Exception as e:
-            detail = str(e) or type(e).__name__
-            console.print(f"[red]✗ Failed to fetch secrets: {detail}[/red]")
-            raise typer.Exit(code=1) from e
-        settings = {"app_id": app_id, "secrets": secrets}
-        if len(credentials) == 1:
-            settings["token"] = credentials[0]
-            console.print("[green]✓ Using token authentication.[/green]")
-        elif len(credentials) == 2:
-            settings["email"] = credentials[0]
-            settings["password"] = hashlib.md5(credentials[1].encode()).hexdigest()  # noqa: S324
-            console.print("[green]✓ Using email/password authentication.[/green]")
+        if app_id and app_secret:
+            console.print(
+                "[cyan]Using the provided app ID and secret "
+                "(skipping the web-player fetch).[/cyan]"
+            )
+            settings = {"app_id": app_id, "secrets": [app_secret]}
         else:
             console.print(
-                "[red]✗ Invalid credentials provided. "
-                "Use a token or email + password.[/red]"
+                "\n[cyan]Fetching API secrets from Qobuz web player...[/cyan]"
             )
-            raise typer.Exit(code=1)
+            try:
+                bundle = await BundleFetcher.fetch()
+                fetched_app_id = bundle.extract_app_id()
+                secrets = list(bundle.extract_secrets().values())
+                console.print("[green]✓ Secrets fetched successfully.[/green]")
+            except Exception as e:
+                detail = str(e) or type(e).__name__
+                console.print(f"[red]✗ Failed to fetch secrets: {detail}[/red]")
+                raise typer.Exit(code=1) from e
+            settings = {"app_id": fetched_app_id, "secrets": secrets}
+
+        settings["token"] = token
+        console.print("[green]✓ Using token authentication.[/green]")
+
         config_manager = ConfigManager(CONFIG_FILE)
         config_manager.save_new_config(settings)
         console.print(
@@ -411,12 +426,7 @@ def download_command(
                     config.app_id, config.secrets, config.max_workers
                 )
 
-                if config.token:
-                    await api_client.authenticator.authenticate_with_token(config.token)
-                else:
-                    await api_client.authenticator.authenticate_with_credentials(
-                        config.email, config.password
-                    )
+                await api_client.authenticator.authenticate_with_token(config.token)
 
                 archive = TrackArchive(CONFIG_DIR)
                 manager = DownloadManager(config, api_client, archive, progress_manager)

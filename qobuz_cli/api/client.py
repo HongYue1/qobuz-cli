@@ -277,12 +277,6 @@ class QobuzAPIClient:
                 await self._rate_limiter.on_429()
                 r.raise_for_status()
 
-            if endpoint == "user/login":
-                if r.status == 401:
-                    raise AuthenticationError("Invalid email or password.")
-                if r.status == 400 and "Invalid application" in await r.text():
-                    raise InvalidAppIdError("The provided App ID is invalid.")
-
             if endpoint == "track/getFileUrl" and r.status == 400:
                 raise InvalidAppSecretError("The app secret is invalid or has expired.")
 

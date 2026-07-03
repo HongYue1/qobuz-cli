@@ -62,12 +62,6 @@ def test_auth_required(config_factory):
         DownloadConfig(**kwargs)
 
 
-def test_email_password_is_valid_auth(config_factory):
-    kwargs = config_factory(token="", email="user@example.com", password="pwhash")
-    config = DownloadConfig(**kwargs)
-    assert config.email == "user@example.com"
-
-
 @pytest.mark.parametrize("app_id", ["12345", "1234567890", "12345678x"])
 def test_app_id_must_be_nine_digits(config_factory, app_id):
     with pytest.raises(ValidationError):

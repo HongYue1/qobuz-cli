@@ -89,8 +89,6 @@ class DownloadConfig(BaseModel):
     """A validated configuration model for the application."""
 
     # Authentication & API
-    email: str = ""
-    password: str = ""  # This will be the MD5 hash
     token: str = ""
     app_id: str = ""
     secrets: list[str] = Field(default_factory=list)
@@ -203,18 +201,10 @@ class DownloadConfig(BaseModel):
     @model_validator(mode="after")
     def validate_auth_and_api_config(self) -> Self:
         """Validates that authentication and API settings are sufficient."""
-        has_token = bool(self.token and self.token.strip())
-        has_email_pass = bool(
-            self.email
-            and self.email.strip()
-            and self.password
-            and self.password.strip()
-        )
-
-        if not has_token and not has_email_pass:
+        if not (self.token and self.token.strip()):
             raise ValueError(
-                "Authentication not configured. Provide either a token or "
-                "email/password."
+                "Authentication not configured. Provide a Qobuz token "
+                "via 'qobuz-cli init <TOKEN>'."
             )
 
         if not self.app_id or not self.app_id.strip() or not self.secrets:

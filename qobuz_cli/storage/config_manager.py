@@ -121,8 +121,6 @@ class ConfigManager:
         """Reads the 'DEFAULT' section of the INI file into a dictionary."""
         section = self._parser["DEFAULT"]
         return {
-            "email": section.get("email", ""),
-            "password": section.get("password", ""),
             "token": section.get("token", ""),
             "app_id": section.get("app_id", ""),
             "secrets": [

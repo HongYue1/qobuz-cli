@@ -1,6 +1,6 @@
 """
-Handles authentication with the Qobuz API, including credential login
-and app secret validation.
+Handles authentication with the Qobuz API using a user token and
+app secret validation.
 """
 
 from __future__ import annotations
@@ -70,36 +70,6 @@ class QobuzAuthenticator:
                     "The provided token is invalid or has expired."
                 ) from e
             raise
-
-    async def authenticate_with_credentials(
-        self, email: str, password_md5: str
-    ) -> dict[str, Any]:
-        """
-        Authenticates using an email and an MD5-hashed password.
-
-        Args:
-            email: The user's email address.
-            password_md5: The user's password, hashed with MD5.
-
-        Returns:
-            The user information dictionary from the API.
-        """
-        log.info(f"Authenticating as: {email}")
-        await self.configure_authentication()
-
-        login_payload = {
-            "email": email,
-            "password": password_md5,
-            "app_id": self._api_client.app_id,
-        }
-
-        user_info = await self._api_client.api_call("user/login", **login_payload)
-
-        if not user_info.get("user", {}).get("credential", {}).get("parameters"):
-            raise IneligibleAccountError("This account is not eligible for streaming.")
-
-        self._api_client.user_auth_token = user_info["user_auth_token"]
-        return user_info
 
     async def configure_authentication(self) -> None:
         """
