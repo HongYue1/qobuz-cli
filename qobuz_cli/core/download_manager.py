@@ -58,7 +58,7 @@ class DownloadManager:
             archive,
             self.stats,
             Downloader(),
-            Tagger(config.embed_art),
+            Tagger(config.embed_art, config.replaygain),
             progress_manager,
         )
 

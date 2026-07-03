@@ -2,6 +2,7 @@
 Handles parsing of Qobuz metadata and writing it as tags to media files.
 """
 
+import contextlib
 import logging
 import re
 from pathlib import Path
@@ -92,11 +93,32 @@ class PerformersParser:
         return self.get_performers_by_role("Main")
 
 
+def build_replaygain_tags(track_meta: dict[str, Any]) -> dict[str, str]:
+    """Build ReplayGain tags from Qobuz-provided loudness metadata.
+
+    Qobuz includes per-track ReplayGain values (ITU-R BS.1770 based) in each
+    track's ``audio_info`` block. Returns ReplayGain tag names mapped to
+    formatted string values, or an empty dict when the data is unavailable.
+    """
+    audio_info = track_meta.get("audio_info") or {}
+    tags: dict[str, str] = {}
+    gain = audio_info.get("replaygain_track_gain")
+    peak = audio_info.get("replaygain_track_peak")
+    if gain is not None:
+        with contextlib.suppress(TypeError, ValueError):
+            tags["REPLAYGAIN_TRACK_GAIN"] = f"{float(gain):.2f} dB"
+    if peak is not None:
+        with contextlib.suppress(TypeError, ValueError):
+            tags["REPLAYGAIN_TRACK_PEAK"] = f"{float(peak):.6f}"
+    return tags
+
+
 class Tagger:
     """Writes metadata tags to MP3 and FLAC files."""
 
-    def __init__(self, embed_art: bool):
+    def __init__(self, embed_art: bool, write_replaygain: bool = False):
         self.embed_art = embed_art
+        self.write_replaygain = write_replaygain
 
     def tag_file(
         self,
@@ -181,6 +203,10 @@ class Tagger:
                 if processed_value:
                     audio[key.upper()] = processed_value
 
+        if self.write_replaygain:
+            for rg_key, rg_val in build_replaygain_tags(track_meta).items():
+                audio[rg_key] = [rg_val]
+
         if self.embed_art:
             self._embed_flac_cover(str(Path(final_path).parent), audio)
 
@@ -222,6 +248,10 @@ class Tagger:
             audio.add(id3.TXXX(encoding=3, desc="PRODUCER", text=producers))
         if tags["barcode"]:
             audio.add(id3.TXXX(encoding=3, desc="BARCODE", text=tags["barcode"]))
+
+        if self.write_replaygain:
+            for rg_key, rg_val in build_replaygain_tags(track_meta).items():
+                audio.add(id3.TXXX(encoding=3, desc=rg_key, text=rg_val))
 
         if self.embed_art:
             self._embed_mp3_cover(str(Path(final_path).parent), audio)

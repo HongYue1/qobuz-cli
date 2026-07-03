@@ -108,6 +108,7 @@ class DownloadConfig(BaseModel):
     no_cover: bool = False
     og_cover: bool = False
     no_m3u: bool = False
+    replaygain: bool = False
 
     # Filtering Options
     albums_only: bool = False

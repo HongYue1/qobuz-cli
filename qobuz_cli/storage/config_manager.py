@@ -138,6 +138,7 @@ class ConfigManager:
             "og_cover": section.getboolean("og_cover", False),
             "albums_only": section.getboolean("albums_only", False),
             "no_m3u": section.getboolean("no_m3u", False),
+            "replaygain": section.getboolean("replaygain", False),
             "no_fallback": section.getboolean("no_fallback", False),
             "smart_discography": section.getboolean("smart_discography", False),
             "download_archive": section.getboolean("download_archive", False),

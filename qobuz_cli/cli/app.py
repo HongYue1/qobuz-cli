@@ -289,6 +289,11 @@ def download_command(
         "--no-m3u/--m3u",
         help="Do not create a .m3u playlist file when downloading a playlist.",
     ),
+    replaygain: bool | None = typer.Option(
+        None,
+        "--replaygain/--no-replaygain",
+        help="Write Qobuz ReplayGain (track gain/peak) tags to downloaded files.",
+    ),
     # --- Content Filtering Options ---
     no_fallback: bool | None = typer.Option(
         None,
@@ -348,6 +353,7 @@ def download_command(
             "og_cover": og_cover,
             "albums_only": albums_only,
             "no_m3u": no_m3u,
+            "replaygain": replaygain,
             "no_fallback": no_fallback,
             "smart_discography": smart_discography,
             "download_archive": download_archive,
