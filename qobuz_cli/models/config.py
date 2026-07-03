@@ -109,6 +109,8 @@ class DownloadConfig(BaseModel):
     og_cover: bool = False
     no_m3u: bool = False
     replaygain: bool = False
+    lyrics: bool = False
+    lyrics_mode: str = "embed"
 
     # Filtering Options
     albums_only: bool = False
@@ -122,6 +124,16 @@ class DownloadConfig(BaseModel):
         validate_assignment=True,
         str_strip_whitespace=True,
     )
+
+    @field_validator("lyrics_mode")
+    @classmethod
+    def _validate_lyrics_mode(cls, value: str) -> str:
+        allowed = {"embed", "lrc", "both"}
+        if value not in allowed:
+            raise ValueError(
+                f"lyrics_mode must be one of {sorted(allowed)}, got '{value}'"
+            )
+        return value
 
     @field_validator("quality")
     @classmethod

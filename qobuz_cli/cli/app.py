@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import time
+from enum import StrEnum
 from pathlib import Path
 
 import typer
@@ -61,6 +62,14 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
     add_completion=False,
 )
+
+
+class LyricsMode(StrEnum):
+    """How fetched lyrics should be saved."""
+
+    embed = "embed"
+    lrc = "lrc"
+    both = "both"
 
 
 def get_config_dir() -> Path:
@@ -294,6 +303,17 @@ def download_command(
         "--replaygain/--no-replaygain",
         help="Write Qobuz ReplayGain (track gain/peak) tags to downloaded files.",
     ),
+    lyrics: bool | None = typer.Option(
+        None,
+        "--lyrics/--no-lyrics",
+        help="Fetch synced lyrics from LRCLIB (embeds into tags by default).",
+    ),
+    lyrics_mode: LyricsMode | None = typer.Option(  # noqa: B008
+        None,
+        "--lyrics-mode",
+        help="How to save lyrics: embed (default), lrc, or both.",
+        case_sensitive=False,
+    ),
     # --- Content Filtering Options ---
     no_fallback: bool | None = typer.Option(
         None,
@@ -354,6 +374,8 @@ def download_command(
             "albums_only": albums_only,
             "no_m3u": no_m3u,
             "replaygain": replaygain,
+            "lyrics": lyrics,
+            "lyrics_mode": lyrics_mode.value if lyrics_mode else None,
             "no_fallback": no_fallback,
             "smart_discography": smart_discography,
             "download_archive": download_archive,

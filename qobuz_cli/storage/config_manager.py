@@ -139,6 +139,8 @@ class ConfigManager:
             "albums_only": section.getboolean("albums_only", False),
             "no_m3u": section.getboolean("no_m3u", False),
             "replaygain": section.getboolean("replaygain", False),
+            "lyrics": section.getboolean("lyrics", False),
+            "lyrics_mode": section.get("lyrics_mode", "embed"),
             "no_fallback": section.getboolean("no_fallback", False),
             "smart_discography": section.getboolean("smart_discography", False),
             "download_archive": section.getboolean("download_archive", False),

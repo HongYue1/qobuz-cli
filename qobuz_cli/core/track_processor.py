@@ -13,7 +13,7 @@ from rich.markup import escape
 
 from qobuz_cli.cli.progress_manager import ProgressManager
 from qobuz_cli.exceptions import FileIntegrityError, QobuzCliError
-from qobuz_cli.media import Downloader, FileIntegrityChecker, Tagger
+from qobuz_cli.media import Downloader, FileIntegrityChecker, LyricsProvider, Tagger
 from qobuz_cli.models.config import DownloadConfig, get_quality_info
 from qobuz_cli.models.stats import DownloadStats
 from qobuz_cli.storage.archive import TrackArchive
@@ -44,6 +44,7 @@ class TrackProcessor:
         self.tagger = tagger
         self.progress_manager = progress_manager
         self.path_formatter = PathFormatter(config.output_template)
+        self.lyrics = LyricsProvider(config.lyrics_mode) if config.lyrics else None
         self._asset_locks: OrderedDict[str, asyncio.Lock] = OrderedDict()
         self._max_locks = 1000  # Limit to 1000 concurrent album locks
         self._asset_lock_main = asyncio.Lock()
@@ -219,6 +220,12 @@ class TrackProcessor:
             )
             if not is_valid:
                 raise FileIntegrityError("Downloaded file failed integrity check.")
+
+            if self.lyrics:
+                with suppress(Exception):
+                    await self.lyrics.process(
+                        str(final_path), is_mp3, track_meta, album_meta
+                    )
 
             self.stats.tracks_downloaded += 1
             final_path_exists = await asyncio.to_thread(final_path.exists)
