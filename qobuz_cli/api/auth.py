@@ -3,6 +3,8 @@ Handles authentication with the Qobuz API, including credential login
 and app secret validation.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
