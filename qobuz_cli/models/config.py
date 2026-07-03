@@ -6,7 +6,7 @@ Provides robust validation for all settings.
 import re
 from typing import Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Maps user-friendly codes to API codes and provides metadata
 QUALITY_MAP = {
@@ -93,11 +93,10 @@ class DownloadConfig(BaseModel):
     config_path: str = Field(..., repr=False)
     source_urls: list[str] = Field(default_factory=list, repr=False)
 
-    class Config:
-        """Pydantic model configuration."""
-
-        validate_assignment = True
-        str_strip_whitespace = True
+    model_config = ConfigDict(
+        validate_assignment=True,
+        str_strip_whitespace=True,
+    )
 
     @field_validator("quality")
     @classmethod
