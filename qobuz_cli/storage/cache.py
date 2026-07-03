@@ -111,7 +111,7 @@ class CacheManager:
                     self._stats_callback(False)
                 return None
 
-            with open(cache_path, encoding="utf-8") as f:
+            with cache_path.open(encoding="utf-8") as f:
                 data = json.load(f)
                 if self._stats_callback:
                     self._stats_callback(True)

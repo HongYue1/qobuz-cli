@@ -3,7 +3,6 @@ Handles parsing of Qobuz metadata and writing it as tags to media files.
 """
 
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any, ClassVar
@@ -113,11 +112,11 @@ class Tagger:
             else:
                 self._tag_flac(temp_file_path, final_file_path, track_meta, album_meta)
 
-            os.rename(temp_file_path, final_file_path)
+            Path(temp_file_path).rename(final_file_path)
             return True
         except Exception as e:
             log.error(
-                f"Failed to tag file '{os.path.basename(final_file_path)}': {e}",
+                f"Failed to tag file '{Path(final_file_path).name}': {e}",
                 exc_info=log.getEffectiveLevel() == logging.DEBUG,
             )
             return False
@@ -183,7 +182,7 @@ class Tagger:
                     audio[key.upper()] = processed_value
 
         if self.embed_art:
-            self._embed_flac_cover(os.path.dirname(final_path), audio)
+            self._embed_flac_cover(str(Path(final_path).parent), audio)
 
         audio.save()
 
@@ -225,15 +224,15 @@ class Tagger:
             audio.add(id3.TXXX(encoding=3, desc="BARCODE", text=tags["barcode"]))
 
         if self.embed_art:
-            self._embed_mp3_cover(os.path.dirname(final_path), audio)
+            self._embed_mp3_cover(str(Path(final_path).parent), audio)
 
         audio.save(filename=temp_path, v2_version=3)
 
     def _embed_flac_cover(self, directory: str, audio: FLAC):
-        cover_path = os.path.join(directory, "cover.jpg")
-        if not os.path.isfile(cover_path):
+        cover_path = Path(directory) / "cover.jpg"
+        if not cover_path.is_file():
             return
-        if os.path.getsize(cover_path) > FLAC_MAX_BLOCKSIZE:
+        if cover_path.stat().st_size > FLAC_MAX_BLOCKSIZE:
             log.warning(
                 "Cover art is too large to embed in FLAC. Try disabling --og-cover."
             )
@@ -242,17 +241,17 @@ class Tagger:
         pic = Picture()
         pic.type = 3
         pic.mime = "image/jpeg"
-        pic.data = Path(cover_path).read_bytes()
+        pic.data = cover_path.read_bytes()
 
         audio.clear_pictures()
         audio.add_picture(pic)
 
     def _embed_mp3_cover(self, directory: str, audio: id3.ID3):
-        cover_path = os.path.join(directory, "cover.jpg")
-        if not os.path.isfile(cover_path):
+        cover_path = Path(directory) / "cover.jpg"
+        if not cover_path.is_file():
             return
 
-        cover_data = Path(cover_path).read_bytes()
+        cover_data = cover_path.read_bytes()
         if "APIC:" in audio:
             del audio["APIC:"]
         audio.add(

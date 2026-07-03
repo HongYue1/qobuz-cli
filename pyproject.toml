@@ -70,6 +70,7 @@ select = [
     "PERF",  # perflint (performance anti-patterns)
     "RET",   # flake8-return (cleaner returns)
     "FURB",  # refurb (modern idioms)
+    "PTH",   # flake8-use-pathlib (prefer pathlib over os.path)
 ]
 
 

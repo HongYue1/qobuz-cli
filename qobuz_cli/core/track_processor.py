@@ -4,7 +4,6 @@ Handles the processing of a single track, from download to tagging.
 
 import asyncio
 import logging
-import os
 from collections import OrderedDict
 from contextlib import suppress
 from pathlib import Path
@@ -240,4 +239,4 @@ class TrackProcessor:
             temp_path_exists = await asyncio.to_thread(temp_path.exists)
             if temp_path_exists:
                 with suppress(OSError):
-                    await asyncio.to_thread(os.remove, temp_path)
+                    await asyncio.to_thread(temp_path.unlink)

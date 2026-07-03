@@ -4,7 +4,6 @@ Manages the SQLite database that archives downloaded track IDs to prevent redown
 
 import asyncio
 import logging
-import os
 import sqlite3
 from itertools import batched
 from pathlib import Path
@@ -77,7 +76,7 @@ class TrackArchive:
             "[yellow]Migrating from legacy text archive to SQLite database...[/yellow]"
         )
         try:
-            with open(txt_archive_path, encoding="utf-8") as f:
+            with txt_archive_path.open(encoding="utf-8") as f:
                 track_ids = [line.strip() for line in f if line.strip()]
 
             if track_ids:
@@ -94,7 +93,7 @@ class TrackArchive:
                 )
 
             backup_path = txt_archive_path.with_suffix(".txt.migrated")
-            os.rename(txt_archive_path, backup_path)
+            txt_archive_path.rename(backup_path)
             log.info(
                 f"[dim]The old text archive has been renamed to '{backup_path.name}'"
                 "[/dim]"
@@ -226,8 +225,8 @@ class TrackArchive:
             conn = self._get_connection()
             conn.close()
 
-            if os.path.exists(self.db_path):
-                os.remove(self.db_path)
+            if self.db_path.exists():
+                self.db_path.unlink()
                 log.info("Download archive database file removed.")
 
             # Re-initialize the database to create an empty one for future use.

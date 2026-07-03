@@ -112,7 +112,7 @@ class ConfigManager:
 
         try:
             self.config_file_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file_path, "w", encoding="utf-8") as configfile:
+            with self.config_file_path.open("w", encoding="utf-8") as configfile:
                 config.write(configfile)
         except OSError as e:
             raise ConfigurationError(f"Failed to save configuration file: {e}") from e
@@ -179,7 +179,7 @@ class ConfigManager:
 
         if needs_saving:
             try:
-                with open(self.config_file_path, "w", encoding="utf-8") as f:
+                with self.config_file_path.open("w", encoding="utf-8") as f:
                     self._parser.write(f)
             except OSError as e:
                 log.error(f"Could not save migrated configuration file: {e}")

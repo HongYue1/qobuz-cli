@@ -74,7 +74,7 @@ class DownloadManager:
         """Saves the current session's stats to a history file."""
         stats_file = Path(self.config.config_path) / "session_history.jsonl"
         try:
-            with open(stats_file, "a", encoding="utf-8") as f:
+            with stats_file.open("a", encoding="utf-8") as f:
                 elapsed_time = time.monotonic() - self.start_time
                 session_data = {
                     "timestamp": int(time.time()),

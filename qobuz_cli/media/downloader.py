@@ -5,7 +5,7 @@ and compression support for optimal performance.
 
 import asyncio
 import logging
-import os
+from pathlib import Path
 
 import aiofiles
 import aiohttp
@@ -159,7 +159,7 @@ class Downloader:
                 last_exception = e
                 log.debug(
                     f"Download attempt {attempt}/{self.max_attempts} for "
-                    f"'{os.path.basename(destination_path)}' failed: {e}. Retrying..."
+                    f"'{Path(destination_path).name}' failed: {e}. Retrying..."
                 )
                 if attempt < self.max_attempts:
                     await asyncio.sleep(self.base_delay * (2 ** (attempt - 1)))
@@ -177,7 +177,7 @@ class Downloader:
         """
         Downloads an asset (like a cover image or booklet) if it doesn't already exist.
         """
-        path_exists = await asyncio.to_thread(os.path.isfile, destination_path)
+        path_exists = await asyncio.to_thread(Path(destination_path).is_file)
         if path_exists:
             return
 
@@ -189,6 +189,4 @@ class Downloader:
                 url, destination_path, total_size_estimate=0, max_workers=max_workers
             )
         except Exception as e:
-            log.debug(
-                f"Failed to download asset '{os.path.basename(destination_path)}': {e}"
-            )
+            log.debug(f"Failed to download asset '{Path(destination_path).name}': {e}")
