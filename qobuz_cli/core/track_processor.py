@@ -136,7 +136,7 @@ class TrackProcessor:
             return track_meta
 
         # Download cover art if needed (optimized double-checked locking)
-        if not self.config.no_cover:
+        if not self.config.no_cover and not self.config.booklet_only:
             album_id_val = album_meta.get("id")
             if album_id_val:
                 album_id_str = str(album_id_val)
@@ -178,6 +178,11 @@ class TrackProcessor:
                             False,
                             self.config.max_workers,
                         )
+
+        # In booklet-only mode, stop after fetching the booklet PDF.
+        if self.config.booklet_only:
+            self.progress_manager.increment_skipped()
+            return track_meta
 
         if not track_url:
             self.stats.tracks_failed += 1

@@ -111,6 +111,7 @@ class DownloadConfig(BaseModel):
     replaygain: bool = False
     lyrics: bool = False
     lyrics_mode: str = "embed"
+    booklet_only: bool = False
 
     # Filtering Options
     albums_only: bool = False

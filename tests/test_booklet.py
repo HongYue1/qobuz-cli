@@ -1,6 +1,7 @@
 """Tests for digital-booklet URL extraction from Qobuz album metadata."""
 
 from qobuz_cli.core.track_processor import extract_booklet_url
+from qobuz_cli.models.config import DownloadConfig
 
 
 def test_returns_booklet_url_for_format_21():
@@ -32,3 +33,13 @@ def test_picks_booklet_among_multiple_goodies():
         ]
     }
     assert extract_booklet_url(album) == "https://x/booklet.pdf"
+
+
+def test_booklet_only_defaults_false(config_factory):
+    config = DownloadConfig(**config_factory())
+    assert config.booklet_only is False
+
+
+def test_booklet_only_can_be_enabled(config_factory):
+    config = DownloadConfig(**config_factory(booklet_only=True))
+    assert config.booklet_only is True

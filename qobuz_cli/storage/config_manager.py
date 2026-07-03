@@ -141,6 +141,7 @@ class ConfigManager:
             "replaygain": section.getboolean("replaygain", False),
             "lyrics": section.getboolean("lyrics", False),
             "lyrics_mode": section.get("lyrics_mode", "embed"),
+            "booklet_only": section.getboolean("booklet_only", False),
             "no_fallback": section.getboolean("no_fallback", False),
             "smart_discography": section.getboolean("smart_discography", False),
             "download_archive": section.getboolean("download_archive", False),

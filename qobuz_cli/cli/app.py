@@ -314,6 +314,11 @@ def download_command(
         help="How to save lyrics: embed (default), lrc, or both.",
         case_sensitive=False,
     ),
+    booklet_only: bool | None = typer.Option(
+        None,
+        "--booklet-only",
+        help="Download only the album booklet PDF; skip audio, cover, tags.",
+    ),
     # --- Content Filtering Options ---
     no_fallback: bool | None = typer.Option(
         None,
@@ -376,6 +381,7 @@ def download_command(
             "replaygain": replaygain,
             "lyrics": lyrics,
             "lyrics_mode": lyrics_mode.value if lyrics_mode else None,
+            "booklet_only": booklet_only,
             "no_fallback": no_fallback,
             "smart_discography": smart_discography,
             "download_archive": download_archive,
