@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qobuz-cli"
-version = "0.0.4"
+version = "0.0.5"
 authors = [{ name = "HongYue1", email = "moonlord369@gmail.com" }]
 description = " Blazing fast Qobuz CLI downloader with modern UI"
 readme = "README.md"
