@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import logging
 import time
+import unicodedata
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -105,15 +106,40 @@ class QobuzAPIClient:
             )
             self._session = aiohttp.ClientSession(
                 connector=connector,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0)"
-                    " Gecko/20100101 Firefox/121.0",
-                    "X-App-Id": self.app_id,
-                    # Enable compression for JSON metadata responses
-                    "Accept-Encoding": "gzip, deflate, br",
-                },
+                headers=self._default_headers(),
                 timeout=aiohttp.ClientTimeout(total=60, connect=15, sock_read=30),
             )
+
+    def _default_headers(self) -> dict[str, str]:
+        """
+        Browser-equivalent headers for the Qobuz web-player origin.
+
+        Sending the full Client Hints / Sec-Fetch set (matching a real Chrome
+        session) makes requests indistinguishable from the official web player,
+        which avoids the WAF 403s and app-id bans that a bare User-Agent
+        triggers. The User-Agent MUST stay consistent with the Sec-Ch-Ua brand
+        list or the mismatch itself becomes a fingerprinting signal.
+        """
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Origin": "https://play.qobuz.com",
+            "Referer": "https://play.qobuz.com/",
+            "Sec-Ch-Ua": (
+                '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"'
+            ),
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+            "X-App-Id": self.app_id,
+        }
 
     async def close(self) -> None:
         """Gracefully closes the aiohttp session."""
@@ -261,11 +287,35 @@ class QobuzAPIClient:
                 raise InvalidAppSecretError("The app secret is invalid or has expired.")
 
             r.raise_for_status()
-            return await r.json()
+            return self._normalize_json_strings(await r.json())
+
+    @staticmethod
+    def _normalize_json_strings(obj: Any) -> Any:
+        """
+        Recursively normalize Unicode strings in an API response to NFC form.
+
+        Qobuz returns some text in decomposed (NFD) form, which produces
+        inconsistent tags and mangled filenames on Windows/macOS. We also fold
+        an ASCII "..." into a real ellipsis (U+2026) since a literal "..." in a
+        title tends to collide with path-truncation logic. URLs are left
+        untouched.
+        """
+        if isinstance(obj, str):
+            if "..." in obj and "://" not in obj:
+                obj = obj.replace("...", "\u2026")
+            return unicodedata.normalize("NFC", obj)
+        if isinstance(obj, dict):
+            return {
+                key: QobuzAPIClient._normalize_json_strings(value)
+                for key, value in obj.items()
+            }
+        if isinstance(obj, list):
+            return [QobuzAPIClient._normalize_json_strings(item) for item in obj]
+        return obj
 
     async def _yield_paginated(
         self, endpoint: str, item_key: str, **kwargs: Any
-    ) -> AsyncGenerator[dict[str, Any]]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Generator for handling paginated API endpoints.
         """
@@ -308,17 +358,21 @@ class QobuzAPIClient:
 
     def fetch_artist_discography(
         self, artist_id: str
-    ) -> AsyncGenerator[dict[str, Any]]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "artist/get", item_key="albums", artist_id=artist_id, extra="albums"
         )
 
-    def fetch_playlist_tracks(self, playlist_id: str) -> AsyncGenerator[dict[str, Any]]:
+    def fetch_playlist_tracks(
+        self, playlist_id: str
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "playlist/get", item_key="tracks", playlist_id=playlist_id, extra="tracks"
         )
 
-    def fetch_label_discography(self, label_id: str) -> AsyncGenerator[dict[str, Any]]:
+    def fetch_label_discography(
+        self, label_id: str
+    ) -> AsyncGenerator[dict[str, Any], None]:
         return self._yield_paginated(
             "label/get", item_key="albums", label_id=label_id, extra="albums"
         )

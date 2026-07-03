@@ -8,7 +8,7 @@ version = "0.0.3"
 authors = [{ name = "HongYue1", email = "moonlord369@gmail.com" }]
 description = " Blazing fast Qobuz CLI downloader with modern UI"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E.*"]
 keywords = ["qobuz", "music", "downloader", "cli", "audio"]
@@ -48,7 +48,7 @@ qcli = "qobuz_cli.__main__:main"
 
 [tool.ruff]
 line-length = 88
-target-version = "py314"
+target-version = "py312"
 
 [tool.ruff.lint]
 preview = true
