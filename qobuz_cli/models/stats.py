@@ -15,6 +15,7 @@ class DownloadStats:
     tracks_skipped_archive: int = 0
     tracks_skipped_exists: int = 0
     tracks_skipped_quality: int = 0
+    tracks_downgraded: int = 0
     tracks_failed: int = 0
     total_size_downloaded: int = 0
     dry_run: bool = False

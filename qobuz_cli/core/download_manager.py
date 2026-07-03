@@ -19,7 +19,11 @@ from qobuz_cli.api.client import QobuzAPIClient
 from qobuz_cli.cli.progress_manager import ProgressManager
 from qobuz_cli.exceptions import NotStreamableError, QobuzCliError
 from qobuz_cli.media import Downloader, Tagger
-from qobuz_cli.models.config import DownloadConfig
+from qobuz_cli.models.config import (
+    DownloadConfig,
+    get_quality_info,
+    resolve_download_format,
+)
 from qobuz_cli.models.stats import DownloadStats
 from qobuz_cli.storage.archive import TrackArchive
 from qobuz_cli.storage.cache import CacheManager
@@ -488,13 +492,11 @@ class DownloadManager:
                     track_meta["id"], self.config.quality
                 )
 
-                restrictions = url_data.get("restrictions", [])
-                quality_restricted = any(
-                    r.get("code") == "FormatRestrictedByFormatAvailability"
-                    for r in restrictions
+                actual_format_id, downgraded = resolve_download_format(
+                    self.config.quality, url_data
                 )
 
-                if quality_restricted and self.config.no_fallback:
+                if downgraded and self.config.no_fallback:
                     log.warning(
                         f"  [yellow]Skipping track '{escape(track_meta['title'])}': "
                         "requested quality not available.[/yellow]"
@@ -506,12 +508,23 @@ class DownloadManager:
                     )
                     return None
 
+                if downgraded:
+                    title = escape(track_meta["title"])
+                    delivered = get_quality_info(actual_format_id)["short"]
+                    requested = get_quality_info(self.config.quality)["short"]
+                    log.info(
+                        f"  [yellow]↓ '{title}': {requested} unavailable, "
+                        f"downloading {delivered} instead.[/yellow]"
+                    )
+                    self.stats.tracks_downgraded += 1
+
                 if processed_meta := await self.track_processor.process_track(
                     track_meta,
                     album_meta,
                     url_data.get("url"),
                     output_dir_override,
                     album_id,
+                    actual_format_id=actual_format_id,
                 ):
                     if self.config.download_archive:
                         await self.archive.add_tracks([processed_meta])

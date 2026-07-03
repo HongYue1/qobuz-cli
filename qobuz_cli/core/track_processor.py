@@ -74,12 +74,16 @@ class TrackProcessor:
         track_url: str | None,
         output_dir_override: Path | None = None,
         album_id: str | None = None,
+        actual_format_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
         Manages the complete lifecycle of downloading and saving a track.
         """
         track_id = str(track_meta["id"])
-        quality_info = get_quality_info(self.config.quality)
+        quality_id = (
+            actual_format_id if actual_format_id is not None else self.config.quality
+        )
+        quality_info = get_quality_info(quality_id)
         ext = quality_info["ext"]
         is_mp3 = ext == "mp3"
 

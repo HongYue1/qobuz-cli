@@ -3,7 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from qobuz_cli.models.config import DownloadConfig, get_quality_info
+from qobuz_cli.models.config import (
+    DownloadConfig,
+    get_quality_info,
+    resolve_download_format,
+)
 
 
 def test_valid_config(config_factory):
@@ -85,3 +89,32 @@ def test_get_ini_keys_excludes_internal_fields():
 def test_get_quality_info_known_and_unknown():
     assert get_quality_info(6)["ext"] == "flac"
     assert get_quality_info(999)["name"] == "Unknown"
+
+
+class TestResolveDownloadFormat:
+    """Smart quality fallback: resolving the actually-delivered format."""
+
+    def test_uses_returned_format_when_available(self):
+        fmt, downgraded = resolve_download_format(27, {"format_id": 27})
+        assert fmt == 27
+        assert downgraded is False
+
+    def test_detects_downgrade_and_returns_actual_format(self):
+        url_data = {
+            "format_id": 6,
+            "restrictions": [{"code": "FormatRestrictedByFormatAvailability"}],
+        }
+        fmt, downgraded = resolve_download_format(27, url_data)
+        assert fmt == 6
+        assert downgraded is True
+
+    def test_missing_format_id_falls_back_to_requested(self):
+        fmt, downgraded = resolve_download_format(7, {})
+        assert fmt == 7
+        assert downgraded is False
+
+    def test_unrelated_restriction_is_not_a_downgrade(self):
+        url_data = {"format_id": 6, "restrictions": [{"code": "SomethingElse"}]}
+        fmt, downgraded = resolve_download_format(6, url_data)
+        assert fmt == 6
+        assert downgraded is False

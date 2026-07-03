@@ -187,6 +187,12 @@ def print_summary_panel(
     if skip_sections:
         stats_table.add_row("○ Skipped:", " + ".join(skip_sections))
 
+    # Tracks downloaded at a lower quality than requested
+    if getattr(stats, "tracks_downgraded", 0) > 0:
+        stats_table.add_row(
+            "↓ Downgraded:", f"[yellow]{stats.tracks_downgraded}[/yellow]"
+        )
+
     # Albums skipped (not streamable)
     if hasattr(stats, "albums_skipped") and stats.albums_skipped > 0:
         stats_table.add_row(

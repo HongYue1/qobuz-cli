@@ -4,7 +4,7 @@ Provides robust validation for all settings.
 """
 
 import re
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -59,6 +59,30 @@ def get_quality_info(quality_id: int) -> dict[str, str]:
             "user_code": 0,
         },
     )
+
+
+# Restriction code the API returns when the requested format is downgraded.
+FORMAT_DOWNGRADE_CODE = "FormatRestrictedByFormatAvailability"
+
+
+def resolve_download_format(
+    requested_id: int, url_data: dict[str, Any]
+) -> tuple[int, bool]:
+    """Resolve the actual delivered audio format from a getFileUrl response.
+
+    Qobuz silently downgrades to the best available format when the requested
+    quality is unavailable, reporting the delivered format via ``format_id`` and
+    a ``FormatRestrictedByFormatAvailability`` restriction entry. Returns the
+    actual format id (for file naming and tagging) and whether a downgrade
+    occurred.
+    """
+    actual_id = url_data.get("format_id") or requested_id
+    restrictions = url_data.get("restrictions") or []
+    downgraded = any(
+        isinstance(r, dict) and r.get("code") == FORMAT_DOWNGRADE_CODE
+        for r in restrictions
+    )
+    return int(actual_id), downgraded
 
 
 class DownloadConfig(BaseModel):
