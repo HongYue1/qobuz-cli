@@ -23,6 +23,14 @@ from qobuz_cli.utils.path import PathFormatter, create_dir
 log = logging.getLogger(__name__)
 
 
+def extract_booklet_url(album_meta: dict[str, Any]) -> str | None:
+    """Returns the URL of the album's digital booklet (PDF), if present."""
+    for goodie in album_meta.get("goodies") or []:
+        if goodie.get("file_format_id") == 21 and goodie.get("url"):
+            return goodie["url"]
+    return None
+
+
 class TrackProcessor:
     """
     Controls the download, tagging, and archiving of a single track.
@@ -150,6 +158,26 @@ class TrackProcessor:
                                 self.config.og_cover,
                                 self.config.max_workers,
                             )
+
+        # Download the album's digital booklet (PDF) if one is available.
+        booklet_url = extract_booklet_url(album_meta)
+        album_id_val = album_meta.get("id")
+        if booklet_url and album_id_val:
+            album_id_str = str(album_id_val)
+            booklet_path = final_dir / "booklet.pdf"
+            path_exists = await asyncio.to_thread(booklet_path.exists)
+            if not path_exists:
+                booklet_lock = await self._get_asset_lock(album_id_str)
+                async with booklet_lock:
+                    path_exists_locked = await asyncio.to_thread(booklet_path.exists)
+                    if not path_exists_locked:
+                        log.debug(f"Downloading booklet for album ID {album_id_str}")
+                        await self.downloader.download_asset(
+                            booklet_url,
+                            str(booklet_path),
+                            False,
+                            self.config.max_workers,
+                        )
 
         if not track_url:
             self.stats.tracks_failed += 1
