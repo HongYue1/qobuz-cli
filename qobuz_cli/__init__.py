@@ -2,4 +2,6 @@
 This is the main package for the qobuz-cli application.
 """
 
-__version__ = "v0.0.2"
+from qobuz_cli._version import __version__
+
+__all__ = ["__version__"]

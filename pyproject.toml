@@ -44,7 +44,7 @@ qobuz-cli = "qobuz_cli.__main__:main"
 qcli = "qobuz_cli.__main__:main"
 
 [dependency-groups]
-dev = ["ruff>=0.10.0", "jsonschema"]
+dev = ["ruff>=0.10.0", "jsonschema", "pytest>=8.0"]
 
 [tool.ruff]
 line-length = 88
@@ -84,7 +84,7 @@ known-first-party = ["qobuz_cli"]
 # Allow unused imports in __init__.py files
 "__init__.py" = ["F401"]
 # Relax security rules in tests
-# "tests/**" = ["S"]
+"tests/**" = ["S"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -92,3 +92,7 @@ ignore_missing_imports = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
