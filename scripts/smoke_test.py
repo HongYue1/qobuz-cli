@@ -250,7 +250,10 @@ def validate_output(out_dir: Path, ctx: dict[str, Any], rec: Recorder) -> None:
     # 12. ReplayGain tags (soft; depends on source availability).
     rg = False
     if raw is not None and raw.tags is not None:
-        keys = {k.lower() for k in raw.tags}
+        # FLAC VComment iterates as (key, value) tuples, so read keys()
+        # explicitly and normalise them to lowercase strings.
+        tag_keys = list(raw.tags.keys())
+        keys = {str(k).lower() for k in tag_keys}
         rg = "replaygain_track_gain" in keys
     rec.record(
         "ReplayGain tags",

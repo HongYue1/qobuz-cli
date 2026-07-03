@@ -178,6 +178,11 @@ class TrackProcessor:
                             False,
                             self.config.max_workers,
                         )
+                        if await asyncio.to_thread(booklet_path.is_file):
+                            self.progress_manager.log_message(
+                                "  [green]📖 Booklet saved:[/] "
+                                f"[dim]{escape(booklet_path.name)}[/dim]"
+                            )
 
         # In booklet-only mode, stop after fetching the booklet PDF.
         if self.config.booklet_only:
